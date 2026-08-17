@@ -4,7 +4,6 @@ import { supabase } from './supabaseClient'
 
 export default function App() {
   const [session, setSession] = useState(null);
-  // (Jätä loppuosa koodista ennalleen...)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -29,12 +28,12 @@ export default function App() {
       <h1>Keräilylista App</h1>
       <p>käyttäjä: {session.user.email}</p>
       <button onClick={() => supabase.auth.signOut()}>Kirjaudu ulos</button>
-      <AppContent />
+      <AppContent session={session} />
     </div>
   );
 }
 
-function AppContent() {
+function AppContent({ session }) {
   const TUOTEKATALOGI = [
     { nimi: "KAalan Maa-artis-bataakeit", grammat: "310g" },
     { nimi: "Balan Kesäkur-juureskeitt", grammat: "310g" },
@@ -107,7 +106,7 @@ function AppContent() {
 
   const vaihdakerätty = (index) => {
     setKeruulista(keruulista.map((item, i) => 
-      i === index ? { ...item, Kerätty: !item.kerätty } : item
+      i === index ? { ...item, kerätty: !item.kerätty } : item
     ));
   };
 
@@ -122,7 +121,7 @@ function AppContent() {
     await haeyhteenveto();
     const { error } = await supabase
       .from('kerailyraportit')
-      .insert([{ tuotteet: keruulista }]);
+      .insert([{ tuotteet: keruulista, user_email: session.user.email }]);
 
     if (error) {
       console.error('Virhe tallennettaessa tietokantaan virhe:', error);
@@ -225,7 +224,7 @@ function AppContent() {
       ) : (
         tietokantaRaportit.map((raportti) => (
           <div key={raportti.id} style={{ border: '1px solid #ccc', padding: '10px', marginBottom: '10px', borderRadius: '5px' }}>
-            <small>Tallennusaika: {new Date(raportti.created_at).toLocaleString('fi-FI')}</small>
+            <small>Tallennusaika: {new Date(raportti.created_at).toLocaleString('fi-FI')} | Käyttäjä: {raportti.user_email}</small>
             <ul>
               {raportti.tuotteet.map((tuote, idx) => (
                 <li key={idx}>
