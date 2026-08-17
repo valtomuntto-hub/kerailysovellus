@@ -107,7 +107,7 @@ function AppContent() {
 
   const vaihdakerätty = (index) => {
     setKeruulista(keruulista.map((item, i) => 
-      i === index ? { ...item, kerätty: !item.kerätty } : item
+      i === index ? { ...item, Kerätty: !item.kerätty } : item
     ));
   };
 
@@ -125,7 +125,7 @@ function AppContent() {
       .insert([{ tuotteet: keruulista }]);
 
     if (error) {
-      console.error('Virhe tallennettaessa tietokantaan:', error);
+      console.error('Virhe tallennettaessa tietokantaan virhe:', error);
       alert('Tietokantaan tallennus epäonnistui.');
     } else {
       haeRaportitTietokannasta();
