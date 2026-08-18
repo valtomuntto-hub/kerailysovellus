@@ -374,4 +374,5 @@ function Yhteenveto({ keruulista }) {
       )}
     </div>
   );
+
 }
