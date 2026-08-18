@@ -225,18 +225,19 @@ function AppContent({ session }) {
 
             <button 
               onClick={merkitseValmiiksi}
-              style={{
-                padding: '10px 16px',
+              className="Mobiilinappi"
+              style={{ 
+                padding: '10px 18px',
                 backgroundColor: '#16a34a',
-                color: 'white',
+                color: '#fff',
                 border: 'none',
                 borderRadius: '6px',
                 cursor: 'pointer',
                 fontWeight: 'bold',
-                marginTop: '10px'
+                fontSize: '15px'
               }}
             >
-              ✅ Keräys valmis
+              ✅ Merkitse valmiiksi
             </button>
           </div>
         )}

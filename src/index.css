@@ -109,3 +109,17 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
+/* Oletuskoko tietokoneelle (normaali) */
+/* Oletuskoko tietokoneelle (normaali) */
+.mobiili-nappi {
+  padding: 8px 16px;
+  font-size: 16px;
+}
+
+/* Kun näyttö on puhelimen kokoinen (alle 1024px), nappi suurenee */
+@media (max-width: 1024px) {
+  .mobiili-nappi {
+    padding: 14px 22px;
+    font-size: 18px;
+  }
+}
