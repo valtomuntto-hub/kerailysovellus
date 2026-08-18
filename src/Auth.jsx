@@ -41,15 +41,16 @@ export default function Auth() {
     setLoading(false) // Asetetaan lataus pois päältä
   }
   return (
-    <div>
-      background color: #000000
-      color: "#ffffff"
-      minHeight: "100vh"
-      display: "flex"
-      flexDirection: "column"
-      alignItems: "center"
-      justifyContent: "center"
-      padding: 20px
+    <div style={{
+      backgroundColor: "#000000",
+      color: "#ffffff",
+      minHeight: "100vh",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 20
+    }}>
       <h2 style={{color: '#ff0000'}}>Kirjaudu sisään / rekisteröidy</h2>
       {message && (
         <p style={{color: 'red', fontWeight: 'bold'}}>
