@@ -142,6 +142,7 @@ export default function Auth() {
           </button>
         </form>
       </div>
-    </div>
+    </div> 
   )
+
 }
