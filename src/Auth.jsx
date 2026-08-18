@@ -42,9 +42,20 @@ export default function Auth() {
   }
   return (
     <div>
-      <h2>Kirjaudu sisään / rekisteröidy</h2>
-      {/* näytetään viesti, jos sellainen on */}
-      {message && <p>{message}</p>}
+      background color: #000000
+      color: "#ffffff"
+      minHeight: "100vh"
+      display: "flex"
+      flexDirection: "column"
+      alignItems: "center"
+      justifyContent: "center"
+      padding: 20px
+      <h2 style={{color: '#ff0000'}}>Kirjaudu sisään / rekisteröidy</h2>
+      {message && (
+        <p style={{color: 'red', fontWeight: 'bold'}}>
+          {message}
+        </p>
+      )}
       <form onSubmit={handleLogin}>
         <input
           type="email"
