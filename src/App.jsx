@@ -192,13 +192,7 @@ function AppContent({ session }) {
                 <li key={index} style={{ marginBottom: '15px', backgroundColor: '#1e293b', padding: '12px', borderRadius: '8px', border: '1px solid #334155' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
                     <div>
-                      <button 
-                        onClick={() => vaihdakerätty(index)}
-                        style={{ marginRight: '10px', padding: '6px 12px', backgroundColor: item.kerätty ? '#166534' : '#991b1b', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                      >
-                        {item.kerätty ? '✔️ Kerätty' : '❌ Ei kerätty'}
-                      </button>
-
+                      
                       <span style={{ textDecoration: item.kerätty ? 'line-through' : 'none', color: item.kerätty ? '#94a3b8' : '#fff' }}>
                         <strong>{item.nimi}</strong> ({item.grammat}) — Tilattu: <strong>{item.määrä} kpl</strong>
                       </span>
@@ -224,21 +218,20 @@ function AppContent({ session }) {
             </ul>
 
             <button 
-              onClick={merkitseValmiiksi}
-              className="Mobiilinappi"
-              style={{ 
-                padding: '10px 18px',
-                backgroundColor: '#16a34a',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                fontSize: '15px'
-              }}
-            >
-              ✅ Merkitse valmiiksi
-            </button>
+  onClick={() => vaihdakerätty(index)}
+  className="mobiili-nappi"
+  style={{ 
+    marginRight: '10px', 
+    backgroundColor: item.kerätty ? '#166534' : '#991b1b', 
+    color: '#fff', 
+    border: 'none', 
+    borderRadius: '6px', 
+    cursor: 'pointer',
+    fontWeight: 'bold'
+  }}
+>
+  {item.kerätty ? '✔️ Kerätty' : '❌ Ei kerätty'}
+</button>
           </div>
         )}
 
