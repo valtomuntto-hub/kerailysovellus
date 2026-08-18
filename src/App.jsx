@@ -269,39 +269,36 @@ function Yhteenveto({ keruulista }) {
   };
 
   return (
-    <div style={{
-      border: '2px solid #3b82f6',
-      borderRadius: '8px',
-      padding: '20px',
-      backgroundColor: '#eff6ff'
+    <div style={{ 
+      background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%)',
+      color: '#f8fafc', 
+      minHeight: '100vh', 
+      padding: '30px',
+      fontFamily: 'sans-serif' 
     }}>
-      <h3>📊 Kokonaisraportti</h3>
-
-      <button 
-        onClick={haeTilastot} 
-        disabled={ladataan}
-        style={{
-          padding: '8px 16px',
-          backgroundColor: '#2563eb',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer'
-        }}
-      >
-        {ladataan ? 'Ladataan...' : '🔄 Laske yhteenveto'}
-      </button>
-
-      {virhe && <p style={{ color: 'red', marginTop: '10px' }}>{virhe}</p>}
-
-      {tilastot && (
-        <div style={{ marginTop: '15px', lineHeight: '1.6' }}>
-          <p>📋 <strong>{tilastot.viesti}</strong></p>
-          <p>🛒 Tilattu yhteensä: <strong>{tilastot.yhteensaTilattu} kpl</strong></p>
-          <p>✅ Kerätty yhteensä: <strong>{tilastot.yhteensaKeratty} kpl</strong></p>
-          <p>⚠️ Puuttuu yhteensä: <strong style={{ color: 'red' }}>{tilastot.puuttuuYhteensa} kpl</strong></p>
+      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <div>
+            <h1 style={{ color: '#60a5fa', margin: 0 }}>Keräilylista App</h1>
+            <p style={{ color: '#93c5fd', margin: '5px 0 0 0', fontSize: '14px' }}>käyttäjä: {session.user.email}</p>
+          </div>
+          <button 
+            onClick={() => supabase.auth.signOut()}
+            style={{ 
+              padding: '8px 16px', 
+              backgroundColor: '#334155', 
+              color: '#ffffff', 
+              border: 'none', 
+              borderRadius: '6px', 
+              cursor: 'pointer' 
+            }}
+          >
+            Kirjaudu ulos
+          </button>
         </div>
-      )}
+
+        <AppContent session={session} />
+      </div>
     </div>
   );
 }
