@@ -335,19 +335,26 @@ function Yhteenveto({ keruulista }) {
     setLadataan(true);
     setVirhe("");
 
-    setTimeout(() => {
-      const yhteensaTilattu = keruulista.reduce((sum, item) => sum + Number(item.määrä || 0), 0);
-      const yhteensaKeratty = keruulista.reduce((sum, item) => sum + Number(item.kerattyMaara || 0), 0);
-      const puuttuuYhteensa = yhteensaTilattu - yhteensaKeratty;
-
-      setTilastot({
-        viesti: "Kokonaisraportti laskettu",
-        yhteensaTilattu,
-        yhteensaKeratty,
-        puuttuuYhteensa
+    try {
+      const vastaus = await fetch('/api/yhteenveto', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tuotteet: keruulista })
       });
+
+      const tulos = await vastaus.json();
+
+      if (!vastaus.ok) {
+        throw new Error(tulos.virhe || 'Virhe laskennassa');
+      }
+
+      setTilastot(tulos);
+    } catch (err) {
+      console.error(err);
+      setVirhe("Palvelinkutsu epäonnistui.");
+    } finally {
       setLadataan(false);
-    }, 300);
+    }
   };
 
   return (
@@ -384,6 +391,7 @@ function Yhteenveto({ keruulista }) {
           <p>🛒 Tilattu yhteensä: <strong>{tilastot.yhteensaTilattu} kpl</strong></p>
           <p>✅ Kerätty yhteensä: <strong>{tilastot.yhteensaKeratty} kpl</strong></p>
           <p>⚠️ Puuttuu yhteensä: <strong style={{ color: '#fca5a5' }}>{tilastot.puuttuuYhteensa} kpl</strong></p>
+          <p>📈 Valmiina: <strong>{tilastot.prosentti}%</strong></p>
         </div>
       )}
     </div>
