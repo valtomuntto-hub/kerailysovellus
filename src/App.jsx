@@ -87,9 +87,19 @@ function AppContent({ session }) {
   const [valmis, setValmis] = useState(false);
   const [tietokantaRaportit, setTietokantaRaportit] = useState([]);
   const [ladataan, setLadataan] = useState(false);
+  
+  // Tunnistetaan näytön koko suoraan tässä
+  const [onPuhelin, setOnPuhelin] = useState(false);
 
   useEffect(() => {
     haeRaportitTietokannasta();
+
+    const tarkistaKoko = () => {
+      setOnPuhelin(window.innerWidth < 768);
+    };
+    tarkistaKoko();
+    window.addEventListener('resize', tarkistaKoko);
+    return () => window.removeEventListener('resize', tarkistaKoko);
   }, []);
 
   const haeyhteenveto = async () => {
@@ -192,16 +202,20 @@ function AppContent({ session }) {
                 <li key={index} style={{ marginBottom: '15px', backgroundColor: '#1e293b', padding: '12px', borderRadius: '8px', border: '1px solid #334155' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                      
+                      {/* Nappi, jonka koko kasvaa automaattisesti puhelimella */}
                       <button 
                         onClick={() => vaihdakerätty(index)}
-                        className="mobiili-nappi"
                         style={{ 
+                          padding: onPuhelin ? '16px 24px' : '10px 16px',
+                          fontSize: onPuhelin ? '18px' : '14px',
                           backgroundColor: item.kerätty ? '#166534' : '#991b1b', 
                           color: '#fff', 
                           border: 'none', 
                           borderRadius: '6px', 
                           cursor: 'pointer',
-                          fontWeight: 'bold'
+                          fontWeight: 'bold',
+                          width: onPuhelin ? '100%' : 'auto'
                         }}
                       >
                         {item.kerätty ? '✔️ Kerätty' : '❌ Ei kerätty'}
@@ -374,5 +388,4 @@ function Yhteenveto({ keruulista }) {
       )}
     </div>
   );
-
 }
