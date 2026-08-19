@@ -59,30 +59,7 @@ export default function App() {
 }
 
 function AppContent({ session }) {
-  const TUOTEKATALOGI = [
-    { nimi: "KAalan Maa-artis-bataakeit", grammat: "310g" },
-    { nimi: "Balan Kesäkur-juureskeitt", grammat: "310g" },
-    { nimi: "Maksalaatikko", grammat: "400g" },
-    { nimi: "Maksalaat lakt rusinoilla", grammat: "400g" },
-    { nimi: "Maksalaatikko lakt", grammat: "400g" },
-    { nimi: "Maksalaatikko", grammat: "700g" },
-    { nimi: "Pirkka Maksalaatikko", grammat: "400g" },
-    { nimi: "Bataattivuoka", grammat: "350g" },
-    { nimi: "Punakaalivuoka", grammat: "350g" },
-    { nimi: "Kurpitsavuoka", grammat: "350g" },
-    { nimi: "Maksalaat puolukkahillolla", grammat: "230g" },
-    { nimi: "Lihamakaronilaat ketsupill", grammat: "220g" },
-    { nimi: "Pekonimakaronilaatikko", grammat: "350g" },
-    { nimi: "Musaka", grammat: "350g" },
-    { nimi: "Lihakaalil.", grammat: "380g" },
-    { nimi: "Pirkka Kinkku-paprikakius", grammat: "650g" },
-    { nimi: "Pirkka Savulohikiusaus", grammat: "650g" },
-    { nimi: "Pirkka Savulohipasta", grammat: "650g" },
-    { nimi: "Pirkka Parmesan-broilerip", grammat: "650g" },
-    { nimi: "Savulohilaatikko", grammat: "350g" },
-    { nimi: "Porkkanaltk", grammat: "400g" }
-  ];
-
+  const [tuotekatalogi, setTuotekatalogi] = useState([]);
   const [keruulista, setKeruulista] = useState([]);
   const [valmis, setValmis] = useState(false);
   const [tietokantaRaportit, setTietokantaRaportit] = useState([]);
@@ -90,6 +67,7 @@ function AppContent({ session }) {
   const [onPuhelin, setOnPuhelin] = useState(false);
 
   useEffect(() => {
+    haeTuotteetSupabasesta();
     haeRaportitTietokannasta();
 
     const tarkistaKoko = () => {
@@ -99,6 +77,18 @@ function AppContent({ session }) {
     window.addEventListener('resize', tarkistaKoko);
     return () => window.removeEventListener('resize', tarkistaKoko);
   }, []);
+
+  const haeTuotteetSupabasesta = async () => {
+    const { data, error } = await supabase
+      .from('tuotteet')
+      .select('*');
+
+    if (error) {
+      console.error('Virhe haettaessa tuotteita:', error);
+    } else {
+      setTuotekatalogi(data || []);
+    }
+  };
 
   const haeyhteenveto = async () => {
     console.log('Keräys merkitty valmiiksi paikallisesti.');
@@ -120,8 +110,13 @@ function AppContent({ session }) {
   };
 
   const luokeruulista = () => {
-    const tuotteidenMaara = Math.floor(Math.random() * 5) + 3;
-    const randomitems = [...TUOTEKATALOGI].sort(() => 0.5 - Math.random());
+    if (tuotekatalogi.length === 0) {
+      alert('Tuoteluettelo on tyhjä tai sitä ei saatu ladattua tietokannasta!');
+      return;
+    }
+
+    const tuotteidenMaara = Math.min(Math.floor(Math.random() * 5) + 3, tuotekatalogi.length);
+    const randomitems = [...tuotekatalogi].sort(() => 0.5 - Math.random());
 
     const uusiLista = randomitems.slice(0, tuotteidenMaara).map((tuote) => {
       const maara = Math.floor(Math.random() * 8) + 1;
