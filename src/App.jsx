@@ -203,12 +203,12 @@ function AppContent({ session }) {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                       
-                      {/* Nappi, jonka koko kasvaa automaattisesti puhelimella */}
+                      {/* Nappi on nyt koneella pienempi (padding: '6px 12px', fontSize: '13px') */}
                       <button 
                         onClick={() => vaihdakerätty(index)}
                         style={{ 
-                          padding: onPuhelin ? '16px 24px' : '10px 16px',
-                          fontSize: onPuhelin ? '18px' : '14px',
+                          padding: onPuhelin ? '16px 24px' : '6px 12px',
+                          fontSize: onPuhelin ? '18px' : '13px',
                           backgroundColor: item.kerätty ? '#166534' : '#991b1b', 
                           color: '#fff', 
                           border: 'none', 
@@ -317,83 +317,6 @@ function AppContent({ session }) {
           ))
         )}
       </div>
-    </div>
-  );
-}
-
-function Yhteenveto({ keruulista }) {
-  const [tilastot, setTilastot] = useState(null);
-  const [ladataan, setLadataan] = useState(false);
-  const [virhe, setVirhe] = useState("");
-
-  const haeTilastot = async () => {
-    if (!keruulista || keruulista.length === 0) {
-      setVirhe("Luo ensin keräilylista!");
-      return;
-    }
-
-    setLadataan(true);
-    setVirhe("");
-
-    try {
-      const vastaus = await fetch('/api/yhteenveto', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tuotteet: keruulista })
-      });
-
-      const tulos = await vastaus.json();
-
-      if (!vastaus.ok) {
-        throw new Error(tulos.virhe || 'Virhe laskennassa');
-      }
-
-      setTilastot(tulos);
-    } catch (err) {
-      console.error(err);
-      setVirhe("Palvelinkutsu epäonnistui.");
-    } finally {
-      setLadataan(false);
-    }
-  };
-
-  return (
-    <div style={{
-      background: 'rgba(15, 23, 42, 0.85)',
-      border: '1px solid #3b82f6',
-      borderRadius: '12px',
-      padding: '25px',
-      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
-    }}>
-      <h3 style={{ color: '#60a5fa', marginTop: 0 }}>📊 Kokonaisraportti</h3>
-
-      <button 
-        onClick={haeTilastot} 
-        disabled={ladataan}
-        style={{
-          padding: '10px 18px',
-          backgroundColor: '#2563eb',
-          color: 'white',
-          border: 'none',
-          borderRadius: '6px',
-          cursor: 'pointer',
-          fontWeight: 'bold'
-        }}
-      >
-        {ladataan ? 'Ladataan...' : '🔄 Laske yhteenveto'}
-      </button>
-
-      {virhe && <p style={{ color: '#fca5a5', marginTop: '10px' }}>{virhe}</p>}
-
-      {tilastot && (
-        <div style={{ marginTop: '15px', lineHeight: '1.6', color: '#e2e8f0' }}>
-          <p style={{ color: '#60a5fa' }}>📋 <strong>{tilastot.viesti}</strong></p>
-          <p>🛒 Tilattu yhteensä: <strong>{tilastot.yhteensaTilattu} kpl</strong></p>
-          <p>✅ Kerätty yhteensä: <strong>{tilastot.yhteensaKeratty} kpl</strong></p>
-          <p>⚠️ Puuttuu yhteensä: <strong style={{ color: '#fca5a5' }}>{tilastot.puuttuuYhteensa} kpl</strong></p>
-          <p>📈 Valmiina: <strong>{tilastot.prosentti}%</strong></p>
-        </div>
-      )}
     </div>
   );
 }
