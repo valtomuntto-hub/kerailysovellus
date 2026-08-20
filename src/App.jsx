@@ -79,9 +79,12 @@ function AppContent({ session }) {
   }, []);
 
   const haeTuotteetSupabasesta = async () => {
+    if (!session?.user?.email) return;
+
     const { data, error } = await supabase
       .from('tuotteet')
-      .select('*');
+      .select('*')
+      .eq('user_email', session.user.email); // <--- TÄMÄ RIVI LISÄTÄÄN
 
     if (error) {
       console.error('Virhe haettaessa tuotteita:', error);
