@@ -95,10 +95,13 @@ function AppContent({ session }) {
   };
 
   const haeRaportitTietokannasta = async () => {
+    if (!session?.user?.email) return;
+
     setLadataan(true);
     const { data, error } = await supabase
       .from('kerailyraportit')
       .select('*')
+      .eq("user_email", session.user.email)
       .order('created_at', { ascending: false });
 
     if (error) {
