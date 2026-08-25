@@ -3,75 +3,87 @@
 // pilvipalvelin (esim. Vercel, jolla React-sovellus on julkaistu) ei pääse
 // käsiksi sisäverkko-osoitteeseen 192.168.2.144. Puhelimet/tabletit, jotka
 // ovat samassa varaston WiFi-verkossa, kutsuvat tätä API:a suoraan.
-import 'dotenv/config';
-import express from 'express';
-import cors from 'cors';
+//
+// "API" (Application Programming Interface) tarkoittaa tässä käytännössä
+// nettiosoitteita (reittejä), joita React-sovellus kutsuu HTTP-pyynnöillä,
+// esim. GET /api/tuotteet - ja jokainen reitti alla vastaa siihen tekemällä
+// tarvittavat SQL-kyselyt ja palauttamalla tuloksen JSON-muodossa.
+import 'dotenv/config';          // lukee server/.env-tiedoston asetukset käyttöön (process.env.X)
+import express from 'express';   // web-palvelinkehys: hoitaa HTTP-pyyntöjen vastaanoton ja reitityksen
+import cors from 'cors';         // sallii selaimen kutsua tätä API:a eri osoitteesta (CORS-suojaus muuten estäisi)
 import { getPool, sql } from './db.js';
 import { register, login, requireAuth } from './auth.js';
 
-const app = express();
+const app = express(); // luodaan itse web-palvelinsovellus
 
 // Sallitaan vain määritellyt selainosoitteet (esim. Vercel-tuotanto-osoite ja/tai
 // paikallinen kehityspalvelin). CORS_ORIGIN voi sisältää pilkulla erotellun listan.
 const sallitutOrigin = (process.env.CORS_ORIGIN || 'http://localhost:5173')
   .split(',')
   .map((s) => s.trim());
-app.use(cors({ origin: sallitutOrigin }));
+app.use(cors({ origin: sallitutOrigin })); // "app.use" = ajetaan JOKAISELLE saapuvalle pyynnölle ennen reittejä
 
-app.use(express.json());
+app.use(express.json()); // jäsentää saapuvan JSON-rungon automaattisesti req.body-oliaksi
 
-// --- Tunnistautuminen (ei vaadi kirjautumista) ---
-app.post('/api/auth/register', register);
+// --- Tunnistautuminen (ei vaadi kirjautumista - näitä pitää päästä kutsumaan ilman tokenia) ---
+app.post('/api/auth/register', register); // POST = lähetetään dataa palvelimelle (uusi kerääjä)
 app.post('/api/auth/login', login);
 
 // --- Terveystarkistus (kätevä sen tarkistamiseen, että palvelu on käynnissä) ---
-app.get('/api/health', (_req, res) => res.json({ ok: true }));
+app.get('/api/health', (_req, res) => res.json({ ok: true })); // GET = pelkkä tiedon haku, ei vaadi mitään dataa mukaan
 
 // --- Tuotteet: koko ProductTypes-katalogi (max 50 riviä, kaikki kerralla) ---
+// "requireAuth" ennen käsittelijää tarkoittaa: tämä reitti toimii vain jos pyynnön
+// mukana tulee kelvollinen Authorization-token (ks. auth.js:n requireAuth-funktio).
 app.get('/api/tuotteet', requireAuth, async (_req, res) => {
   try {
     const pool = await getPool();
     const tulos = await pool.request()
       .query('SELECT TOP (50) SKUId, SKUDescription FROM dbo.ProductTypes ORDER BY SKUId');
 
+    // Muunnetaan SQL-sarakkeet (SKUId, SKUDescription) React-puolen odottamiksi
+    // kenttänimiksi (skuId, nimi) - pieni "käännös" tietokannan ja käyttöliittymän välillä
     const tuotteet = tulos.recordset.map((r) => ({
       skuId: r.SKUId,
       nimi: r.SKUDescription,
     }));
 
-    res.json(tuotteet);
+    res.json(tuotteet); // Express muuttaa JS-taulukon automaattisesti JSON-tekstiksi
   } catch (err) {
-    console.error('Tuotteiden haku epäonnistui:', err);
+    console.error('Tuotteiden haku epäonnistui:', err); // tarkka virhe palvelimen omaan lokiin (ei käyttäjälle asti)
     res.status(500).json({ virhe: 'Tuotteiden haku epäonnistui.' });
   }
 });
 
 // --- Keruutulosten tallennus: yksi keräyskerta = monta riviä samalla aikaleimalla ---
 app.post('/api/keruutulokset', requireAuth, async (req, res) => {
-  const { tuotteet } = req.body || {};
+  const { tuotteet } = req.body || {}; // React lähettää tässä koko keruulistan (jokaisen tuotteen ja kerätyn määrän)
 
   if (!Array.isArray(tuotteet) || tuotteet.length === 0) {
-    return res.status(400).json({ virhe: 'Tuotelista puuttuu.' });
+    return res.status(400).json({ virhe: 'Tuotelista puuttuu.' }); // 400 = "Bad Request", pyyntö oli virheellinen
   }
 
-  const keraaja = req.user.nimi; // kerääjä luetaan JWT-tokenista, ei luoteta clientin lähettämään arvoon
+  const keraaja = req.user.nimi; // kerääjä luetaan JWT-tokenista (requireAuth asetti req.user), ei luoteta clientin lähettämään arvoon
   const aikaleima = new Date();  // sama aikaleima kaikille tämän keräyksen riveille -> voidaan ryhmitellä yhdeksi raportiksi myöhemmin
 
   try {
     const pool = await getPool();
+    // "Transaktio" tarkoittaa: joko KAIKKI rivit tallentuvat onnistuneesti, tai EI YHTÄÄN
+    // (jos jokin rivi epäonnistuu kesken, kaikki aiemmatkin peruttaan) - näin kanta ei
+    // koskaan jää "puolittain tallennettuun" tilaan.
     const transaction = new sql.Transaction(pool);
     await transaction.begin();
 
     try {
-      for (const rivi of tuotteet) {
+      for (const rivi of tuotteet) {                              // käydään jokainen kerätty tuote läpi omana INSERT-rivinä
         const skuId = Number(rivi.skuId);
-        const maara = Number(rivi.kerattyMaara ?? rivi.maara ?? 0);
+        const maara = Number(rivi.kerattyMaara ?? rivi.maara ?? 0); // ?? = käytä ensimmäistä arvoa joka ei ole null/undefined
 
         if (!Number.isFinite(skuId)) {
           throw new Error(`Virheellinen skuId: ${rivi.skuId}`);
         }
 
-        await new sql.Request(transaction)
+        await new sql.Request(transaction)                        // huom: käytetään transaktion Requestia, ei suoraan poolia
           .input('skuId', sql.Int, skuId)
           .input('maara', sql.Decimal(18, 2), maara)
           .input('keraaja', sql.VarChar, keraaja)
@@ -80,10 +92,10 @@ app.post('/api/keruutulokset', requireAuth, async (req, res) => {
                   VALUES (@skuId, @maara, @keraaja, @aikaleima)`);
       }
 
-      await transaction.commit();
+      await transaction.commit(); // kaikki rivit onnistuivat -> vahvistetaan pysyvästi kantaan
     } catch (err) {
-      await transaction.rollback();
-      throw err;
+      await transaction.rollback(); // jokin meni pieleen kesken -> perutaan kaikki tämän keräyksen rivit
+      throw err;                     // heitetään virhe eteenpäin ulompaan catch-lohkoon
     }
 
     res.status(201).json({ viesti: 'Keruutulokset tallennettu.', rivienMaara: tuotteet.length });
@@ -105,9 +117,14 @@ app.get('/api/keruutulokset', requireAuth, async (req, res) => {
         LEFT JOIN dbo.ProductTypes p ON p.SKUId = k.SKUId
         WHERE k.Keraaja = @keraaja
         ORDER BY k.Aikaleima DESC`);
+    // LEFT JOIN ProductTypes: haetaan mukaan tuotteen nimi (SKUDescription), jotta ei tarvitse
+    // näyttää käyttäjälle pelkkiä SKU-numeroita. LEFT (eikä tavallinen JOIN) varmistaa, että
+    // rivi näkyy silti vaikka tuote olisi sittemmin poistunut ProductTypes-taulusta.
 
-    // Ryhmitellään yksittäiset rivit takaisin yhdeksi raportiksi per keräyskerta
-    // (sama Keraaja + sama Aikaleima = yksi POST /api/keruutulokset -kutsu).
+    // MobileKeruuTulokset-taulussa ei ole erillistä "keräyskerta"-tunnusta (tietoisesti
+    // yksinkertaistettu rakenne) - siksi rivit ryhmitellään tässä takaisin yhdeksi
+    // raportiksi käyttämällä avaimena (Keraaja + Aikaleima) -paria, koska kaikki saman
+    // POST /api/keruutulokset -kutsun rivit tallennettiin samalla aikaleimalla.
     const raportit = new Map();
     for (const rivi of tulos.recordset) {
       const avain = `${rivi.Keraaja}|${rivi.Aikaleima.toISOString()}`;
@@ -121,7 +138,7 @@ app.get('/api/keruutulokset', requireAuth, async (req, res) => {
       });
     }
 
-    res.json([...raportit.values()]);
+    res.json([...raportit.values()]); // Map -> tavallinen taulukko, jonka JSON osaa esittää
   } catch (err) {
     console.error('Raporttien haku epäonnistui:', err);
     res.status(500).json({ virhe: 'Raporttien haku epäonnistui.' });
@@ -129,25 +146,27 @@ app.get('/api/keruutulokset', requireAuth, async (req, res) => {
 });
 
 // --- Kokonaisraportin laskenta (sama logiikka kuin entisessä Vercel-funktiossa) ---
+// Huom: tämä reitti EI kosketa tietokantaa lainkaan - se vain laskee lukuja
+// suoraan React-sovelluksen lähettämästä keruulistasta (nopea, ei tarvitse SQL-kyselyä).
 app.post('/api/yhteenveto', requireAuth, (req, res) => {
   const tuotteet = req.body?.tuotteet;
   if (!Array.isArray(tuotteet) || tuotteet.length === 0) {
     return res.status(400).json({ virhe: 'Tuotelista puuttuu' });
   }
 
-  let tilattuYhteensa = 0;
-  let kerattyYhteensa = 0;
-  let rivitKeratty = 0;
+  let tilattuYhteensa = 0;   // kaikkien rivien "tilattu määrä" -sarakkeen summa
+  let kerattyYhteensa = 0;   // kaikkien rivien "kerätty määrä" -sarakkeen summa
+  let rivitKeratty = 0;      // montako riviä on merkitty täysin kerätyksi
 
   for (const t of tuotteet) {
-    const tilattu = Number(t.määrä) || 0;
+    const tilattu = Number(t.määrä) || 0;        // || 0 varmistaa ettei tule NaN jos kenttä puuttuu
     const keratty = Number(t.kerattyMaara) || 0;
     tilattuYhteensa += tilattu;
     kerattyYhteensa += keratty;
     if (t.kerätty || keratty >= tilattu) rivitKeratty += 1;
   }
 
-  const puuttuu = Math.max(0, tilattuYhteensa - kerattyYhteensa);
+  const puuttuu = Math.max(0, tilattuYhteensa - kerattyYhteensa); // ei koskaan negatiivinen luku näytölle
   const prosentti = tilattuYhteensa === 0 ? 0 : Math.round((kerattyYhteensa / tilattuYhteensa) * 100);
 
   res.status(200).json({
@@ -163,6 +182,6 @@ app.post('/api/yhteenveto', requireAuth, (req, res) => {
 });
 
 const port = process.env.PORT || 3001;
-app.listen(port, () => {
+app.listen(port, () => {                                    // käynnistää palvelimen kuuntelemaan saapuvia pyyntöjä
   console.log(`Keräilylista-API kuuntelee portissa ${port}`);
 });

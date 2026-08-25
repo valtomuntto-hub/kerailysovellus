@@ -2,20 +2,26 @@ import { useState, useEffect } from 'react'
 import Auth from './Auth'
 import { api } from './apiClient'
 
+// Tämä on sovelluksen juurikomponentti - React renderöi tämän ensimmäisenä.
+// Se päättää näytetäänkö kirjautumislomake (Auth) vai itse sovellus (AppContent)
+// riippuen siitä, onko selaimessa tallennettu voimassa oleva istunto.
 export default function App() {
-  // Istunto luetaan käynnistyessä localStoragesta (apiClient.getSession()),
-  // jotta sivun päivitys ei kirjaa käyttäjää ulos.
+  // useState(() => ...) -muoto suorittaa funktion vain KERRAN ensimmäisellä renderöinnillä
+  // (ei joka kerta uudelleen) - näin istunto luetaan localStoragesta heti käynnistyessä,
+  // jotta sivun päivitys (F5) ei kirjaa käyttäjää ulos turhaan.
   const [session, setSession] = useState(() => api.getSession());
 
+  // Auth-komponentti kutsuu tätä kun kirjautuminen onnistuu (ks. Auth.jsx:n onLogin-props)
   const handleLogin = (uusiSessio) => {
-    setSession(uusiSessio);
+    setSession(uusiSessio); // tallennetaan istunto tilaan -> React piirtää AppContentin näkyviin
   };
 
   const handleLogout = () => {
-    api.logout();
-    setSession(null);
+    api.logout();     // pyyhkii tokenin localStoragesta
+    setSession(null);  // -> seuraavalla renderöinnillä palataan takaisin kirjautumislomakkeeseen
   };
 
+  // Jos ei ole kirjautunut istuntoa, näytetään VAIN kirjautumislomake eikä mitään muuta
   if (!session) {
     return <Auth onLogin={handleLogin} />;
   }
@@ -56,24 +62,23 @@ export default function App() {
 }
 
 function AppContent() {
-  const [tuotekatalogi, setTuotekatalogi] = useState([]);
-  const [keruulista, setKeruulista] = useState([]);
-  const [valmis, setValmis] = useState(false);
-  const [tietokantaRaportit, setTietokantaRaportit] = useState([]);
+  const [tuotekatalogi, setTuotekatalogi] = useState([]);   // ProductTypes-tuotteet API:sta
+  const [keruulista, setKeruulista] = useState([]);          // aktiivinen, käyttäjän täyttämä keruulista
+  const [valmis, setValmis] = useState(false);                // onko nykyinen keruu merkitty valmiiksi
+  const [tietokantaRaportit, setTietokantaRaportit] = useState([]); // aiemmin tallennetut keräykset
   const [ladataan, setLadataan] = useState(false);
-  const [onPuhelin, setOnPuhelin] = useState(false);
+  const [onPuhelin, setOnPuhelin] = useState(false);          // puhelinkoon UI-säädöille
   const [virheviesti, setVirheviesti] = useState('');
 
+  // Ajetaan kerran komponentin latautuessa: haetaan alkudata ja seurataan ikkunan kokoa
   useEffect(() => {
     haeTuotteetTietokannasta();
     haeRaportitTietokannasta();
 
-    const tarkistaKoko = () => {
-      setOnPuhelin(window.innerWidth < 768);
-    };
+    const tarkistaKoko = () => setOnPuhelin(window.innerWidth < 768);
     tarkistaKoko();
     window.addEventListener('resize', tarkistaKoko);
-    return () => window.removeEventListener('resize', tarkistaKoko);
+    return () => window.removeEventListener('resize', tarkistaKoko); // siivotaan kuuntelija pois
   }, []);
 
   // Hakee koko ProductTypes-tuotekatalogin (stodb) paikallisen API:n kautta

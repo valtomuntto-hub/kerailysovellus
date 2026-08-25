@@ -4,37 +4,46 @@ import { api } from './apiClient'
 // Kevyt nimi+PIN-kirjautuminen (korvaa aiemman Supabase-sähköposti/salasana-kirjautumisen).
 // Sopii sisäiseen lähiverkon työkaluun: nopea käyttää käsipäätteellä, PIN tallennetaan
 // palvelimella aina hashattuna, ei koskaan selväkielisenä.
+//
+// "onLogin" on funktio, jonka App.jsx antaa tälle komponentille parametrina (props) -
+// kun kirjautuminen onnistuu, kutsutaan sitä ja App.jsx päivittää oman tilansa niin,
+// että kirjautumislomakkeen sijaan näytetään itse sovellus.
 export default function Auth({ onLogin }) {
-  const [nimi, setNimi] = useState('')
-  const [pin, setPin] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState('')
+  // useState palauttaa parin [nykyinenArvo, funktioArvonMuuttamiseen] - kun funktiota
+  // kutsutaan, React piirtää komponentin uudelleen uudella arvolla.
+  const [nimi, setNimi] = useState('')       // lomakkeen "Nimi"-kentän sisältö
+  const [pin, setPin] = useState('')          // lomakkeen "PIN-koodi"-kentän sisältö
+  const [loading, setLoading] = useState(false) // true kun odotetaan palvelimen vastausta (napit disabloidaan silloin)
+  const [message, setMessage] = useState('')    // virhe- tai onnistumisviesti näytettäväksi
 
+  // Kutsutaan kun lomake lähetetään (Enter tai "Kirjaudu sisään" -nappi)
   const handleLogin = async (e) => {
-    e.preventDefault()
+    e.preventDefault() // estää selainta lataamasta sivua uudelleen (lomakkeen oletuskäytös)
     setLoading(true)
     setMessage('')
 
     try {
-      const data = await api.login(nimi.trim(), pin)
-      onLogin({ nimi: data.nimi, token: data.token })
+      const data = await api.login(nimi.trim(), pin)      // kutsuu POST /api/auth/login
+      onLogin({ nimi: data.nimi, token: data.token })      // ilmoitetaan App.jsx:lle että kirjautuminen onnistui
     } catch (err) {
-      setMessage(err.message)
+      setMessage(err.message)                              // esim. "Väärä nimi tai PIN."
     } finally {
-      setLoading(false)
+      setLoading(false) // suoritetaan onnistui tai ei - napit palautuvat aktiivisiksi
     }
   }
 
+  // Kutsutaan "Rekisteröidy uutena keräilijänä" -napista - luo uuden tilin,
+  // mutta EI kirjaa automaattisesti sisään (käyttäjä painaa itse "Kirjaudu sisään" sen jälkeen)
   const handleRegister = async (e) => {
     e.preventDefault()
     setLoading(true)
     setMessage('')
 
     try {
-      await api.register(nimi.trim(), pin)
+      await api.register(nimi.trim(), pin) // kutsuu POST /api/auth/register
       setMessage('Käyttäjä luotu! Voit nyt kirjautua sisään samoilla tiedoilla.')
     } catch (err) {
-      setMessage(err.message)
+      setMessage(err.message) // esim. "Tämä nimi on jo käytössä, valitse toinen."
     } finally {
       setLoading(false)
     }
