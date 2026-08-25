@@ -1,14 +1,22 @@
 // Tietokantayhteyden asetukset ja yhteyspooli stodb SQL Server -kantaan.
-// Käyttää mobileapi_user-SQL-kirjautumista (ei Windows-tunnistautumista, koska
-// tämä prosessi ajetaan taustapalveluna eikä kirjautuneen käyttäjän kontekstissa).
+// Käyttää Windows-tunnistautumista (NTLM) paikallisella VM-tilillä
+// WIN2022VM\mobileapi_svc — EI SQL-loginia/Mixed Modea, koska palvelin
+// sallii vain Windows-tunnistautumisen eikä sitä haluttu muuttaa
+// (olisi vaatinut SQL Server -palvelun uudelleenkäynnistyksen tuotannossa).
 import sql from 'mssql';
 import 'dotenv/config';
 
 const config = {
   server: process.env.DB_SERVER,
   database: process.env.DB_DATABASE,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
+  authentication: {
+    type: 'ntlm',
+    options: {
+      domain: process.env.DB_DOMAIN,   // VM:n NetBIOS-nimi, esim. WIN2022VM (ei Active Directory -toimialue)
+      userName: process.env.DB_USER,   // paikallinen Windows-tili, esim. mobileapi_svc
+      password: process.env.DB_PASSWORD,
+    },
+  },
   options: {
     encrypt: true,               // salattu yhteys
     trustServerCertificate: true, // sisäverkon SQL Serverillä ei ole julkisen CA:n varmennetta
