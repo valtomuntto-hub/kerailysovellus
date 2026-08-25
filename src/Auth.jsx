@@ -1,9 +1,12 @@
 import { useState } from 'react'
-import { supabase } from './supabaseClient'
+import { api } from './apiClient'
 
-export default function Auth() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+// Kevyt nimi+PIN-kirjautuminen (korvaa aiemman Supabase-sähköposti/salasana-kirjautumisen).
+// Sopii sisäiseen lähiverkon työkaluun: nopea käyttää käsipäätteellä, PIN tallennetaan
+// palvelimella aina hashattuna, ei koskaan selväkielisenä.
+export default function Auth({ onLogin }) {
+  const [nimi, setNimi] = useState('')
+  const [pin, setPin] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
 
@@ -12,41 +15,40 @@ export default function Auth() {
     setLoading(true)
     setMessage('')
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-
-    if (error) {
-      setMessage(error.message)
+    try {
+      const data = await api.login(nimi.trim(), pin)
+      onLogin({ nimi: data.nimi, token: data.token })
+    } catch (err) {
+      setMessage(err.message)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
-  const handleSignup = async (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault()
     setLoading(true)
     setMessage('')
 
-    const { error } = await supabase.auth.signUp({ email, password })
-
-    if (error) {
-      setMessage(error.message)
-    } else {
-      setMessage('Rekisteröityminen onnistui! Tarkista sähköpostisi.')
+    try {
+      await api.register(nimi.trim(), pin)
+      setMessage('Käyttäjä luotu! Voit nyt kirjautua sisään samoilla tiedoilla.')
+    } catch (err) {
+      setMessage(err.message)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (
-    <div style={{ 
+    <div style={{
       background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%)',
-      color: '#ffffff', 
-      minHeight: '100vh', 
-      display: 'flex', 
-      flexDirection: 'column', 
-      alignItems: 'center', 
-      justifyContent: 'center', 
+      color: '#ffffff',
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
       padding: '20px',
       fontFamily: 'sans-serif'
     }}>
@@ -64,9 +66,9 @@ export default function Auth() {
           📦 Keräilylista
         </h2>
         <p style={{ textAlign: 'center', color: '#93c5fd', marginTop: 0, marginBottom: '20px', fontSize: '14px' }}>
-          Kirjaudu sisään tai rekisteröidy jatkaaksesi
+          Kirjaudu nimelläsi ja PIN-koodillasi
         </p>
-        
+
         {message && (
           <p style={{ color: '#fca5a5', fontWeight: 'bold', textAlign: 'center', fontSize: '14px', backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: '10px', borderRadius: '6px' }}>
             {message}
@@ -75,15 +77,16 @@ export default function Auth() {
 
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
           <input
-            type="email"
-            placeholder="Sähköposti"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={{ 
-              padding: '12px', 
-              backgroundColor: '#1e293b', 
-              color: '#fff', 
-              border: '1px solid #475569', 
+            type="text"
+            placeholder="Nimi"
+            autoComplete="username"
+            value={nimi}
+            onChange={(e) => setNimi(e.target.value)}
+            style={{
+              padding: '12px',
+              backgroundColor: '#1e293b',
+              color: '#fff',
+              border: '1px solid #475569',
               borderRadius: '6px',
               fontSize: '15px',
               outline: 'none'
@@ -91,30 +94,32 @@ export default function Auth() {
           />
           <input
             type="password"
-            placeholder="Salasana"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={{ 
-              padding: '12px', 
-              backgroundColor: '#1e293b', 
-              color: '#fff', 
-              border: '1px solid #475569', 
+            inputMode="numeric"
+            placeholder="PIN-koodi"
+            autoComplete="current-password"
+            value={pin}
+            onChange={(e) => setPin(e.target.value)}
+            style={{
+              padding: '12px',
+              backgroundColor: '#1e293b',
+              color: '#fff',
+              border: '1px solid #475569',
               borderRadius: '6px',
               fontSize: '15px',
               outline: 'none'
             }}
           />
-          
-          <button 
-            type="submit" 
-            disabled={loading} 
-            style={{ 
-              padding: '12px', 
-              backgroundColor: '#2563eb', 
-              color: '#ffffff', 
-              border: 'none', 
-              borderRadius: '6px', 
-              cursor: 'pointer', 
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              padding: '12px',
+              backgroundColor: '#2563eb',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
               fontWeight: 'bold',
               fontSize: '15px',
               transition: 'background 0.2s'
@@ -123,26 +128,25 @@ export default function Auth() {
             {loading ? 'Ladataan...' : 'Kirjaudu sisään'}
           </button>
 
-          <button 
-            type="button" 
-            onClick={handleSignup} 
-            disabled={loading} 
-            style={{ 
-              padding: '12px', 
-              backgroundColor: 'transparent', 
-              color: '#93c5fd', 
-              border: '1px solid #3b82f6', 
-              borderRadius: '6px', 
+          <button
+            type="button"
+            onClick={handleRegister}
+            disabled={loading}
+            style={{
+              padding: '12px',
+              backgroundColor: 'transparent',
+              color: '#93c5fd',
+              border: '1px solid #3b82f6',
+              borderRadius: '6px',
               cursor: 'pointer',
               fontWeight: 'bold',
               fontSize: '15px'
             }}
           >
-            Rekisteröidy uutena käyttäjänä
+            Rekisteröidy uutena keräilijänä
           </button>
         </form>
       </div>
-    </div> 
+    </div>
   )
-
 }

@@ -1,73 +1,71 @@
 import { useState, useEffect } from 'react'
 import Auth from './Auth'
-import { supabase } from './supabaseClient'
+import { api } from './apiClient'
 
 export default function App() {
-  const [session, setSession] = useState(null);
+  // Istunto luetaan käynnistyessä localStoragesta (apiClient.getSession()),
+  // jotta sivun päivitys ei kirjaa käyttäjää ulos.
+  const [session, setSession] = useState(() => api.getSession());
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
+  const handleLogin = (uusiSessio) => {
+    setSession(uusiSessio);
+  };
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, []);
+  const handleLogout = () => {
+    api.logout();
+    setSession(null);
+  };
 
   if (!session) {
-    return <Auth />;
+    return <Auth onLogin={handleLogin} />;
   }
 
   return (
-    <div style={{ 
+    <div style={{
       background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%)',
-      color: '#f8fafc', 
-      minHeight: '100vh', 
+      color: '#f8fafc',
+      minHeight: '100vh',
       padding: '30px',
-      fontFamily: 'sans-serif' 
+      fontFamily: 'sans-serif'
     }}>
       <div style={{ maxWidth: '800px', margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <div>
             <h1 style={{ color: '#60a5fa', margin: 0 }}>Keräilylista App</h1>
-            <p style={{ color: '#93c5fd', margin: '5px 0 0 0', fontSize: '14px' }}>käyttäjä: {session.user.email}</p>
+            <p style={{ color: '#93c5fd', margin: '5px 0 0 0', fontSize: '14px' }}>kerääjä: {session.nimi}</p>
           </div>
-          <button 
-            onClick={() => supabase.auth.signOut()}
-            style={{ 
-              padding: '8px 16px', 
-              backgroundColor: '#334155', 
-              color: '#ffffff', 
-              border: 'none', 
-              borderRadius: '6px', 
-              cursor: 'pointer' 
+          <button
+            onClick={handleLogout}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#334155',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer'
             }}
           >
             Kirjaudu ulos
           </button>
         </div>
 
-        <AppContent session={session} />
+        <AppContent />
       </div>
     </div>
   );
 }
 
-function AppContent({ session }) {
+function AppContent() {
   const [tuotekatalogi, setTuotekatalogi] = useState([]);
   const [keruulista, setKeruulista] = useState([]);
   const [valmis, setValmis] = useState(false);
   const [tietokantaRaportit, setTietokantaRaportit] = useState([]);
   const [ladataan, setLadataan] = useState(false);
   const [onPuhelin, setOnPuhelin] = useState(false);
+  const [virheviesti, setVirheviesti] = useState('');
 
   useEffect(() => {
-    haeTuotteetSupabasesta();
+    haeTuotteetTietokannasta();
     haeRaportitTietokannasta();
 
     const tarkistaKoko = () => {
@@ -78,53 +76,39 @@ function AppContent({ session }) {
     return () => window.removeEventListener('resize', tarkistaKoko);
   }, []);
 
-  const haeTuotteetSupabasesta = async () => {
-    if (!session?.user?.email) return;
-
-    const { data, error } = await supabase
-      .from('tuotteet')
-      .select('*')
-      .eq('user_email', session.user.email); // <--- TÄMÄ RIVI LISÄTÄÄN
-
-    if (error) {
-      console.error('Virhe haettaessa tuotteita:', error);
-    } else {
+  // Hakee koko ProductTypes-tuotekatalogin (stodb) paikallisen API:n kautta
+  const haeTuotteetTietokannasta = async () => {
+    try {
+      const data = await api.haeTuotteet();
       setTuotekatalogi(data || []);
+    } catch (err) {
+      console.error('Virhe haettaessa tuotteita:', err);
+      setVirheviesti('Tuotteiden haku epäonnistui: ' + err.message);
     }
-  };
-
-  const haeyhteenveto = async () => {
-    console.log('Keräys merkitty valmiiksi paikallisesti.');
   };
 
   const haeRaportitTietokannasta = async () => {
-    if (!session?.user?.email) return;
-
     setLadataan(true);
-    const { data, error } = await supabase
-      .from('kerailyraportit')
-      .select('*')
-      .eq("user_email", session.user.email)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Virhe haettaessa raportteja:', error);
-    } else {
+    try {
+      const data = await api.haeRaportit();
       setTietokantaRaportit(data || []);
+    } catch (err) {
+      console.error('Virhe haettaessa raportteja:', err);
+      setVirheviesti('Raporttien haku epäonnistui: ' + err.message);
+    } finally {
+      setLadataan(false);
     }
-    setLadataan(false);
   };
 
+  // Keruulista = KAIKKI tuotekatalogin tuotteet kerralla (max 50 kpl, ProductTypesin koko sisältö).
+  // Jokaiselle riville arvotaan "tilattu määrä" samalla tavalla kuin aiemmassa demo-versiossa.
   const luokeruulista = () => {
     if (tuotekatalogi.length === 0) {
       alert('Tuoteluettelo on tyhjä tai sitä ei saatu ladattua tietokannasta!');
       return;
     }
 
-    const tuotteidenMaara = Math.min(Math.floor(Math.random() * 5) + 3, tuotekatalogi.length);
-    const randomitems = [...tuotekatalogi].sort(() => 0.5 - Math.random());
-
-    const uusiLista = randomitems.slice(0, tuotteidenMaara).map((tuote) => {
+    const uusiLista = tuotekatalogi.map((tuote) => {
       const maara = Math.floor(Math.random() * 8) + 1;
       return {
         ...tuote,
@@ -139,34 +123,36 @@ function AppContent({ session }) {
   };
 
   const vaihdakerätty = (index) => {
-    setKeruulista(keruulista.map((item, i) => 
+    setKeruulista(keruulista.map((item, i) =>
       i === index ? { ...item, kerätty: !item.kerätty } : item
     ));
   };
 
   const muutaKerattyMaaraa = (index, uusiMaara) => {
-    setKeruulista(keruulista.map((item, i) => 
+    setKeruulista(keruulista.map((item, i) =>
       i === index ? { ...item, kerattyMaara: Math.max(0, Number(uusiMaara)) } : item
     ));
   };
 
   const merkitseValmiiksi = async () => {
     setValmis(true);
-    await haeyhteenveto();
-    const { error } = await supabase
-      .from('kerailyraportit')
-      .insert([{ tuotteet: keruulista, user_email: session.user.email }]);
-
-    if (error) {
-      console.error('Virhe tallennettaessa tietokantaan virhe:', error);
-      alert('Tietokantaan tallennus epäonnistui.');
-    } else {
+    try {
+      await api.tallennaKeruu(keruulista);
       haeRaportitTietokannasta();
+    } catch (err) {
+      console.error('Virhe tallennettaessa tietokantaan:', err);
+      alert('Tietokantaan tallennus epäonnistui: ' + err.message);
     }
   };
 
   return (
     <div>
+      {virheviesti && (
+        <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444', color: '#fca5a5', padding: '12px', borderRadius: '8px', marginBottom: '20px' }}>
+          ⚠️ {virheviesti}
+        </div>
+      )}
+
       <div style={{
         background: 'rgba(15, 23, 42, 0.85)',
         padding: '25px',
@@ -177,7 +163,7 @@ function AppContent({ session }) {
       }}>
         <h2 style={{ color: '#60a5fa', marginTop: 0 }}>📦 Keräilylista</h2>
 
-        <button 
+        <button
           onClick={luokeruulista}
           style={{
             padding: '10px 18px',
@@ -190,7 +176,7 @@ function AppContent({ session }) {
             fontSize: '15px'
           }}
         >
-          🎲 Luo keruulista
+          🎲 Luo keruulista ({tuotekatalogi.length} tuotetta)
         </button>
 
         {keruulista.length > 0 && !valmis && (
@@ -198,18 +184,18 @@ function AppContent({ session }) {
             <h3 style={{ color: '#93c5fd' }}>Aktiivinen keruu:</h3>
             <ul style={{ listStyle: 'none', paddingLeft: 0 }}>
               {keruulista.map((item, index) => (
-                <li key={index} style={{ marginBottom: '15px', backgroundColor: '#1e293b', padding: '12px', borderRadius: '8px', border: '1px solid #334155' }}>
+                <li key={item.skuId ?? index} style={{ marginBottom: '15px', backgroundColor: '#1e293b', padding: '12px', borderRadius: '8px', border: '1px solid #334155' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                      <button 
+                      <button
                         onClick={() => vaihdakerätty(index)}
-                        style={{ 
+                        style={{
                           padding: onPuhelin ? '16px 24px' : '6px 12px',
                           fontSize: onPuhelin ? '18px' : '13px',
-                          backgroundColor: item.kerätty ? '#166534' : '#991b1b', 
-                          color: '#fff', 
-                          border: 'none', 
-                          borderRadius: '6px', 
+                          backgroundColor: item.kerätty ? '#166534' : '#991b1b',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '6px',
                           cursor: 'pointer',
                           fontWeight: 'bold',
                           width: onPuhelin ? '100%' : 'auto'
@@ -219,7 +205,7 @@ function AppContent({ session }) {
                       </button>
 
                       <span style={{ textDecoration: item.kerätty ? 'line-through' : 'none', color: item.kerätty ? '#94a3b8' : '#fff' }}>
-                        <strong>{item.nimi}</strong> ({item.grammat}) — Tilattu: <strong>{item.määrä} kpl</strong>
+                        <strong>{item.nimi}</strong> (SKU {item.skuId}) — Tilattu: <strong>{item.määrä} kpl</strong>
                       </span>
                     </div>
 
@@ -242,7 +228,7 @@ function AppContent({ session }) {
               ))}
             </ul>
 
-            <button 
+            <button
               onClick={merkitseValmiiksi}
               style={{
                 padding: '10px 18px',
@@ -263,12 +249,12 @@ function AppContent({ session }) {
 
         {valmis && (
           <div style={{ marginTop: '20px', backgroundColor: '#1e293b', padding: '15px', borderRadius: '8px', border: '1px solid #334155' }}>
-            <h3 style={{ color: '#60a5fa' }}>📋 Keräysraportti Saarioinen</h3>
+            <h3 style={{ color: '#60a5fa' }}>📋 Keräysraportti</h3>
             <ul style={{ paddingLeft: '20px' }}>
               {keruulista.map((item, index) => {
                 const puuttuu = item.määrä - item.kerattyMaara;
                 return (
-                  <li key={index} style={{ marginBottom: '6px' }}>
+                  <li key={item.skuId ?? index} style={{ marginBottom: '6px' }}>
                     <strong>{item.nimi}</strong>: Kerätty {item.kerattyMaara} / {item.määrä} kpl{' '}
                     {puuttuu > 0 ? (
                       <span style={{ color: '#fca5a5' }}>(Puuttuu {puuttuu} kpl)</span>
@@ -300,13 +286,13 @@ function AppContent({ session }) {
         ) : tietokantaRaportit.length === 0 ? (
           <p style={{ color: '#93c5fd' }}>Ei tallennettuja keräyksiä tietokannassa.</p>
         ) : (
-          tietokantaRaportit.map((raportti) => (
-            <div key={raportti.id} style={{ backgroundColor: '#1e293b', border: '1px solid #334155', padding: '15px', marginBottom: '12px', borderRadius: '8px' }}>
-              <small style={{ color: '#93c5fd' }}>Tallennusaika: {new Date(raportti.created_at).toLocaleString('fi-FI')} | Käyttäjä: {raportti.user_email}</small>
+          tietokantaRaportit.map((raportti, i) => (
+            <div key={i} style={{ backgroundColor: '#1e293b', border: '1px solid #334155', padding: '15px', marginBottom: '12px', borderRadius: '8px' }}>
+              <small style={{ color: '#93c5fd' }}>Tallennusaika: {new Date(raportti.aikaleima).toLocaleString('fi-FI')} | Kerääjä: {raportti.keraaja}</small>
               <ul style={{ margin: '10px 0 0 0', paddingLeft: '20px', color: '#e2e8f0' }}>
                 {raportti.tuotteet.map((tuote, idx) => (
                   <li key={idx}>
-                    {tuote.nimi}: {tuote.kerattyMaara} / {tuote.määrä} kpl
+                    {tuote.nimi} (SKU {tuote.skuId}): {tuote.maara} kpl
                   </li>
                 ))}
               </ul>
@@ -333,22 +319,11 @@ function Yhteenveto({ keruulista }) {
     setVirhe("");
 
     try {
-      const vastaus = await fetch('/api/yhteenveto', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tuotteet: keruulista })
-      });
-
-      const tulos = await vastaus.json();
-
-      if (!vastaus.ok) {
-        throw new Error(tulos.virhe || 'Virhe laskennassa');
-      }
-
+      const tulos = await api.yhteenveto(keruulista);
       setTilastot(tulos);
     } catch (err) {
       console.error(err);
-      setVirhe("Palvelinkutsu epäonnistui.");
+      setVirhe("Palvelinkutsu epäonnistui: " + err.message);
     } finally {
       setLadataan(false);
     }
@@ -364,8 +339,8 @@ function Yhteenveto({ keruulista }) {
     }}>
       <h3 style={{ color: '#60a5fa', marginTop: 0 }}>📊 Kokonaisraportti</h3>
 
-      <button 
-        onClick={haeTilastot} 
+      <button
+        onClick={haeTilastot}
         disabled={ladataan}
         style={{
           padding: '10px 18px',

@@ -1,0 +1,19 @@
+{
+  "name": "kerailysovellus-api",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Paikallinen REST-API, joka välittää Keräilylista-React-sovelluksen ja stodb SQL Server -kannan välillä. Ajetaan Win2022VM:llä samassa lähiverkossa kuin SQL Server.",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "mssql": "^11.0.1"
+  }
+}
