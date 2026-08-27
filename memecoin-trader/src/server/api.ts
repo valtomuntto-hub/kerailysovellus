@@ -20,10 +20,14 @@ export function startServer(engine: TradeEngine): void {
   app.get("/api/status", async (_req, res) => {
     const today = db.getTodayStats();
     let solBalance: number | null = null;
-    try {
-      solBalance = await getSolBalance();
-    } catch {
-      // Lompakkoa ei ole asetettu (esim. pelkkaa paperikauppaa ajetaan ilman avainta).
+    if (config.LIVE_TRADING) {
+      try {
+        solBalance = await getSolBalance();
+      } catch {
+        // Lompakkoa ei ole asetettu tai RPC ei vastaa.
+      }
+    } else {
+      solBalance = db.getPaperBalanceSol(config.PAPER_STARTING_BALANCE_SOL);
     }
     res.json({
       liveTrading: config.LIVE_TRADING,

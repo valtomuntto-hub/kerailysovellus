@@ -11,6 +11,10 @@ const schema = z.object({
   WALLET_PRIVATE_KEY: z.string().default(""),
   LIVE_TRADING: boolFromString,
 
+  // Virtuaalisalkun aloitussaldo paperikaupassa (LIVE_TRADING=false) - ei koske
+  // oikeaa lompakkoa, joten paperikauppaa voi testata ilman WALLET_PRIVATE_KEY:ta.
+  PAPER_STARTING_BALANCE_SOL: z.coerce.number().positive().default(1),
+
   MAX_POSITION_SOL: z.coerce.number().positive().default(0.05),
   MAX_CONCURRENT_POSITIONS: z.coerce.number().int().positive().default(3),
   MAX_DAILY_LOSS_SOL: z.coerce.number().positive().default(0.2),

@@ -96,7 +96,7 @@
 <div class="panel">
   <h2>Tilanne</h2>
   <div class="stats">
-    <div class="stat"><div class="label">Lompakon saldo</div><div class="value mono" id="statBalance">-</div></div>
+    <div class="stat"><div class="label" id="statBalanceLabel">Saldo</div><div class="value mono" id="statBalance">-</div></div>
     <div class="stat"><div class="label">Paivan PnL</div><div class="value mono" id="statPnl">-</div></div>
     <div class="stat"><div class="label">Paivan kaupat</div><div class="value mono" id="statTrades">-</div></div>
     <div class="stat"><div class="label">Botti pysahdyksissa</div><div class="value mono" id="statHalted">-</div></div>
@@ -164,6 +164,7 @@ function renderStatus(s) {
     badge.textContent = "PAPERIKAUPPA";
   }
 
+  document.getElementById("statBalanceLabel").textContent = s.liveTrading ? "Lompakon saldo" : "Saldo (virtuaalinen)";
   document.getElementById("statBalance").textContent = s.solBalance == null ? "ei lompakkoa" : fmtSol(s.solBalance);
   const pnlEl = document.getElementById("statPnl");
   pnlEl.textContent = fmtSol(s.today.realizedPnlSol);

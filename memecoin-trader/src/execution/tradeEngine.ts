@@ -151,7 +151,9 @@ export class TradeEngine {
     if (universe.length === 0) return;
 
     const alreadyOpen = new Set(db.getOpenPositions().map((p) => p.mint));
-    const solBalance = await getSolBalance().catch(() => 0);
+    const solBalance = config.LIVE_TRADING
+      ? await getSolBalance().catch(() => 0)
+      : db.getPaperBalanceSol(config.PAPER_STARTING_BALANCE_SOL);
     const positionSize = riskManager.positionSizeSol(solBalance);
     if (positionSize <= 0) {
       logger.warn("SOL-saldo liian pieni uuden position avaamiseen.");

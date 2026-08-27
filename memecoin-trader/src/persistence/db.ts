@@ -136,6 +136,17 @@ export function closePosition(
   `).run({ id, ...updates });
 }
 
+/**
+ * Paperikaupan virtuaalisaldo: aloitussaldo miinus avoimiin positioihin
+ * sidottu SOL, plus suljetuista positioista realisoitunut PnL. Ei koske
+ * oikeaa lompakkoa - talla botti on testattavissa ilman WALLET_PRIVATE_KEY:ta.
+ */
+export function getPaperBalanceSol(startingBalanceSol: number): number {
+  const open = db.prepare(`SELECT COALESCE(SUM(sol_spent), 0) AS s FROM positions WHERE status = 'open'`).get() as any;
+  const closed = db.prepare(`SELECT COALESCE(SUM(pnl_sol), 0) AS s FROM positions WHERE status = 'closed'`).get() as any;
+  return startingBalanceSol - open.s + closed.s;
+}
+
 export function getClosedPositions(limit = 50): Position[] {
   const rows = db
     .prepare(`SELECT * FROM positions WHERE status = 'closed' ORDER BY exit_timestamp DESC LIMIT ?`)
