@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>memecoin-trader</title>
+<style>
+  :root {
+    --bg: #0b0e14;
+    --panel: #11151d;
+    --panel-border: #232a37;
+    --text: #e6e9ef;
+    --text-dim: #8b93a7;
+    --green: #3ddc84;
+    --red: #ff5c5c;
+    --amber: #f5b942;
+    --accent: #5b8cff;
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    padding: 20px;
+  }
+  h1 { font-size: 18px; margin: 0; }
+  .sub { color: var(--text-dim); font-size: 13px; }
+  .banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 14px 18px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    border: 1px solid var(--panel-border);
+  }
+  .banner.live { background: linear-gradient(90deg, rgba(255,92,92,0.15), transparent); border-color: var(--red); }
+  .banner.paper { background: linear-gradient(90deg, rgba(61,220,132,0.12), transparent); border-color: var(--green); }
+  .badge {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 4px 10px;
+    border-radius: 999px;
+  }
+  .badge.live { background: var(--red); color: #200; }
+  .badge.paper { background: var(--green); color: #002; }
+  .stats { display: flex; gap: 24px; flex-wrap: wrap; }
+  .stat { min-width: 110px; }
+  .stat .label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat .value { font-size: 18px; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 18px;
+  }
+  .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); margin: 0 0 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; font-variant-numeric: tabular-nums; }
+  th { color: var(--text-dim); font-weight: 500; border-bottom: 1px solid var(--panel-border); }
+  tr:not(:last-child) td { border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .empty { color: var(--text-dim); font-size: 13px; padding: 8px 0; }
+  .weight-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; }
+  .weight-label { width: 130px; color: var(--text-dim); flex-shrink: 0; }
+  .weight-track { flex: 1; height: 8px; background: rgba(255,255,255,0.06); border-radius: 4px; position: relative; overflow: hidden; }
+  .weight-fill { position: absolute; top: 0; bottom: 0; }
+  .weight-fill.pos { background: var(--green); left: 50%; }
+  .weight-fill.neg { background: var(--red); right: 50%; }
+  .weight-mid { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.2); }
+  .weight-val { width: 48px; text-align: right; color: var(--text-dim); }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .tag { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: rgba(255,255,255,0.08); color: var(--text-dim); }
+  .tag.sim { color: var(--amber); }
+  footer { color: var(--text-dim); font-size: 11px; margin-top: 24px; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="banner" id="banner">
+  <div>
+    <h1>memecoin-trader</h1>
+    <div class="sub">Automaattinen, oppiva Solana-memecoin-botti</div>
+  </div>
+  <span class="badge" id="modeBadge">...</span>
+</div>
+
+<div class="panel">
+  <h2>Tilanne</h2>
+  <div class="stats">
+    <div class="stat"><div class="label">Lompakon saldo</div><div class="value mono" id="statBalance">-</div></div>
+    <div class="stat"><div class="label">Paivan PnL</div><div class="value mono" id="statPnl">-</div></div>
+    <div class="stat"><div class="label">Paivan kaupat</div><div class="value mono" id="statTrades">-</div></div>
+    <div class="stat"><div class="label">Botti pysahdyksissa</div><div class="value mono" id="statHalted">-</div></div>
+    <div class="stat"><div class="label">Avoimet positiot</div><div class="value mono" id="statOpenCount">-</div></div>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="panel">
+    <h2>Avoimet positiot</h2>
+    <table id="openTable"><thead><tr>
+      <th>Symbol</th><th>Entry $</th><th>Nyt $</th><th>PnL %</th><th>Avattu</th>
+    </tr></thead><tbody></tbody></table>
+    <div class="empty" id="openEmpty" style="display:none;">Ei avoimia positioita.</div>
+  </div>
+
+  <div class="panel">
+    <h2>Oppivan mallin painot</h2>
+    <div class="sub" id="learnerMeta" style="margin-bottom:10px;"></div>
+    <div id="weights"></div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Viimeisimmat kaupat</h2>
+  <table id="tradesTable"><thead><tr>
+    <th>Aika</th><th>Tyyppi</th><th>Symbol</th><th>Hinta $</th><th>SOL</th><th>Pisteet</th><th>Syy</th>
+  </tr></thead><tbody></tbody></table>
+  <div class="empty" id="tradesEmpty" style="display:none;">Ei viela kauppoja.</div>
+</div>
+
+<div class="panel">
+  <h2>Suljetut positiot</h2>
+  <table id="closedTable"><thead><tr>
+    <th>Symbol</th><th>Entry $</th><th>Exit $</th><th>PnL SOL</th><th>PnL %</th><th>Syy</th>
+  </tr></thead><tbody></tbody></table>
+  <div class="empty" id="closedEmpty" style="display:none;">Ei viela suljettuja positioita.</div>
+</div>
+
+<footer>Paivittyy automaattisesti 5s valein. Tama ei ole sijoitusneuvontaa - memecoinit ovat aarimmaisen riskialttiita.</footer>
+
+<script>
+const fmtUsd = (v) => v == null ? "-" : "$" + Number(v).toLocaleString("fi-FI", { maximumFractionDigits: v < 1 ? 6 : 4 });
+const fmtSol = (v) => v == null ? "-" : Number(v).toFixed(4) + " SOL";
+const fmtPct = (v) => v == null ? "-" : (v >= 0 ? "+" : "") + Number(v).toFixed(1) + "%";
+const fmtTime = (ts) => new Date(ts).toLocaleTimeString("fi-FI");
+const cls = (v) => v >= 0 ? "pos" : "neg";
+
+async function getJson(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(url + " -> " + res.status);
+  return res.json();
+}
+
+function renderStatus(s) {
+  const banner = document.getElementById("banner");
+  const badge = document.getElementById("modeBadge");
+  if (s.liveTrading) {
+    banner.className = "banner live";
+    badge.className = "badge live";
+    badge.textContent = "LIVE - OIKEA RAHA";
+  } else {
+    banner.className = "banner paper";
+    badge.className = "badge paper";
+    badge.textContent = "PAPERIKAUPPA";
+  }
+
+  document.getElementById("statBalance").textContent = s.solBalance == null ? "ei lompakkoa" : fmtSol(s.solBalance);
+  const pnlEl = document.getElementById("statPnl");
+  pnlEl.textContent = fmtSol(s.today.realizedPnlSol);
+  pnlEl.className = "value mono " + cls(s.today.realizedPnlSol);
+  document.getElementById("statTrades").textContent = s.today.tradesCount;
+  document.getElementById("statHalted").textContent = s.today.halted ? "KYLLA" : "ei";
+
+  document.getElementById("learnerMeta").textContent =
+    `${s.learner.trainedExamples} opetusesimerkkia kertynyt`;
+
+  const weights = document.getElementById("weights");
+  weights.innerHTML = "";
+  const maxAbs = Math.max(...s.learner.weights.map((w) => Math.abs(w)), 0.01);
+  s.learner.weights.forEach((w, i) => {
+    const pctWidth = Math.min(Math.abs(w) / maxAbs, 1) * 50;
+    const row = document.createElement("div");
+    row.className = "weight-row";
+    row.innerHTML = `
+      <div class="weight-label">${s.learner.weightLabels[i] ?? "?"}</div>
+      <div class="weight-track">
+        <div class="weight-mid"></div>
+        <div class="weight-fill ${w >= 0 ? "pos" : "neg"}" style="width:${pctWidth}%"></div>
+      </div>
+      <div class="weight-val mono">${w.toFixed(2)}</div>
+    `;
+    weights.appendChild(row);
+  });
+}
+
+function renderPositions(data) {
+  const openBody = document.querySelector("#openTable tbody");
+  openBody.innerHTML = "";
+  document.getElementById("openEmpty").style.display = data.open.length ? "none" : "block";
+  document.getElementById("statOpenCount").textContent = data.open.length;
+  for (const p of data.open) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${p.symbol}</td>
+      <td class="mono">${fmtUsd(p.entryPriceUsd)}</td>
+      <td class="mono">${fmtUsd(p.currentPriceUsd)}</td>
+      <td class="mono ${p.pnlPct == null ? "" : cls(p.pnlPct)}">${p.pnlPct == null ? "-" : fmtPct(p.pnlPct)}</td>
+      <td>${fmtTime(p.entryTimestamp)}</td>
+    `;
+    openBody.appendChild(tr);
+  }
+
+  const closedBody = document.querySelector("#closedTable tbody");
+  closedBody.innerHTML = "";
+  document.getElementById("closedEmpty").style.display = data.closed.length ? "none" : "block";
+  for (const p of data.closed) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${p.symbol}</td>
+      <td class="mono">${fmtUsd(p.entryPriceUsd)}</td>
+      <td class="mono">${fmtUsd(p.exitPriceUsd)}</td>
+      <td class="mono ${cls(p.pnlSol ?? 0)}">${fmtSol(p.pnlSol)}</td>
+      <td class="mono ${cls(p.pnlPct ?? 0)}">${fmtPct(p.pnlPct)}</td>
+      <td class="sub">${p.exitReason ?? "-"}</td>
+    `;
+    closedBody.appendChild(tr);
+  }
+}
+
+function renderTrades(trades) {
+  const body = document.querySelector("#tradesTable tbody");
+  body.innerHTML = "";
+  document.getElementById("tradesEmpty").style.display = trades.length ? "none" : "block";
+  for (const t of trades) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${fmtTime(t.timestamp)}</td>
+      <td>${t.type === "buy" ? "OSTO" : "MYYNTI"} ${t.dryRun ? '<span class="tag sim">SIM</span>' : ""}</td>
+      <td>${t.symbol}</td>
+      <td class="mono">${fmtUsd(t.priceUsd)}</td>
+      <td class="mono">${fmtSol(t.solAmount)}</td>
+      <td class="mono">${t.score != null ? t.score.toFixed(2) : "-"}</td>
+      <td class="sub">${t.reason ?? "-"}</td>
+    `;
+    body.appendChild(tr);
+  }
+}
+
+async function refresh() {
+  try {
+    const [status, positions, trades] = await Promise.all([
+      getJson("/api/status"),
+      getJson("/api/positions"),
+      getJson("/api/trades"),
+    ]);
+    renderStatus(status);
+    renderPositions(positions);
+    renderTrades(trades);
+  } catch (err) {
+    console.error("Paivitys epaonnistui", err);
+  }
+}
+
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>
