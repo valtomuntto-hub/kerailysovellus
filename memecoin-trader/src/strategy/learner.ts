@@ -1,6 +1,6 @@
 import { logger } from "../logger.js";
 
-export const FEATURE_COUNT = 7;
+export const FEATURE_COUNT = 8;
 const LEARNING_RATE = 0.05;
 const L2_REG = 0.001;
 
@@ -27,8 +27,19 @@ export class OnlineLearner {
   trainedExamples: number;
 
   constructor(initial?: LearnerState) {
-    this.weights = initial?.weights ? [...initial.weights] : defaultWeights();
-    this.trainedExamples = initial?.trainedExamples ?? 0;
+    if (initial && initial.weights.length === FEATURE_COUNT) {
+      this.weights = [...initial.weights];
+      this.trainedExamples = initial.trainedExamples;
+    } else {
+      if (initial) {
+        logger.warn(
+          `Tallennettu mallin tila (${initial.weights.length} painoa) ei vastaa nykyista piirremaaraa ` +
+            `(${FEATURE_COUNT}) - esim. uusi ominaisuus lisatty. Nollataan mallin painot lahtoarvoihin.`
+        );
+      }
+      this.weights = defaultWeights();
+      this.trainedExamples = 0;
+    }
   }
 
   score(input: number[]): number {
@@ -53,10 +64,10 @@ export class OnlineLearner {
 }
 
 function defaultWeights(): number[] {
-  // [bias, momentum_5m, momentum_1h, vol/likviditeetti, osto/myynti_5m, osto/myynti_1h, ika]
-  // Lievasti momentum- ja ostopaine-painotteinen lahtoarvaus ennen kuin
-  // oma kaupankayntihistoria opettaa painot uusiksi.
-  return [-0.5, 0.8, 0.6, 0.4, 0.5, 0.3, 0.1];
+  // [bias, momentum_5m, momentum_1h, vol/likviditeetti, osto/myynti_5m, osto/myynti_1h, ika, copy-trade]
+  // Lievasti momentum-, ostopaine- ja copy-trade-painotteinen lahtoarvaus
+  // ennen kuin oma kaupankayntihistoria opettaa painot uusiksi.
+  return [-0.5, 0.8, 0.6, 0.4, 0.5, 0.3, 0.1, 0.5];
 }
 
 function dot(a: number[], b: number[]): number {

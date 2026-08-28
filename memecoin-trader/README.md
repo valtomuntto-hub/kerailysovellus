@@ -50,6 +50,7 @@ src/
   data/
     dexscreener.ts         Markkinadata: hinnat, volyymi, likviditeetti, ika
     tokenUniverse.ts        Trendaavien tokenien kandidaattijoukko
+    walletTracker.ts         Seurattujen lompakoiden (WATCHED_WALLETS) hallussapito
   strategy/
     features.ts             Raakadatasta piirrevektoriksi mallille
     learner.ts               Online-logistinen regressio - "oppiva" osto/myyntimalli
@@ -126,12 +127,13 @@ oleminen oli vahinko.
 
 Malli on **online-logistinen regressio** (`src/strategy/learner.ts`) - lineaarinen
 malli joka antaa 0-1 -pisteet sille kuinka todennakoisesti kauppa olisi
-voitollinen, seitsemasta piirteesta:
+voitollinen, kahdeksasta piirteesta:
 
 - hintamomentum 5 min ja 1 h
 - volyymi suhteessa likviditeettiin
 - osto/myyntipaine (tx-maarat) 5 min ja 1 h
 - parin ika
+- copy-trade-signaali (katso "Copy-trading" alla) - 0 jos `WATCHED_WALLETS` on tyhja
 
 Kun positio suljetaan (voitolla tai tappiolla), botti paivittaa painoja
 stokastisella gradienttinousulla sen mukaan mika piirre ennusti lopputulosta
@@ -143,6 +145,41 @@ Talla ei ole mitaan tekemista syvaoppimisen tai "AI ennustaa tulevaisuuden"
 -mielikuvan kanssa - se on yksinkertainen, selitettava tilastomalli joka
 sopeutuu **omaan** kaupankayntihistoriaasi. Se voi yhta hyvin oppia vaaria
 korrelaatioita kuin oikeitakin, varsinkin ennen kuin dataa on kertynyt paljon.
+
+## Copy-trading (valinnainen lisasignaali)
+
+Voit antaa `WATCHED_WALLETS`-asetuksessa pilkulla erotetun listan Solana-
+lompakko-osoitteita. Botti tarkistaa joka kierroksella mita tokeneita nama
+lompakot TALLA HETKELLA pitavat hallussaan, ja jos jokin skannatuista
+ehdokkaista loytyy jonkin seuratun lompakon salkusta, se nostaa kyseisen
+tokenin pisteita mallissa (`copy-trade`-piirre, katso "Miten 'oppiminen'
+oikeasti toimii"). Malli oppii ajan myota itse kuinka paljon tahan signaaliin
+kannattaa luottaa - jos se osoittautuu omassa historiassasi hyodyttomaksi,
+sen paino painuu kohti nollaa.
+
+**Tarkeaa ymmartaa ennen kuin lisaat lompakoita:**
+
+- Tama on **pollaava**, ei reaaliaikainen toteutus (samaan tahtiin kuin
+  botin muukin 45s-kierto). Se ei kuuntele transaktioita livena, vaan
+  katsoo mita seuratut lompakot pitavat hallussaan silla hetkella kun botti
+  kayn kierroksensa - havaitseminen on siis aina jonkin verran jaljessa
+  siita hetkesta kun seurattu lompakko oikeasti osti.
+- Copy-trading EI poista viive- tai sisapiiririskia: jos moni muukin
+  seuraa samaa lompakkoa, hinta voi olla jo revennyt ylos ennen kuin botti
+  ehtii mukaan, ja moni "hyvalta nayttava" lompakko on itse asiassa
+  tokenin kehittaja/sisapiirilainen joka dumppaa kopioijien paalle.
+- Signaali VAIN nostaa pisteita - se ei ohita likviditeetti-/ika-/mint-
+  authority-suodattimia eika riskirajoja. Sokeaa "osta aina kun lompakko X
+  ostaa" -logiikkaa tama ei ole.
+- Lompakko-osoitteiden loytaminen/kuratointi on omalla vastuullasi (esim.
+  Solscan/DexScreener/Birdeye "top holders" -nakymista) - kukaan ei takaa
+  etta lompakko joka on nayttanyt hyvalta menneisyydessa on sita jatkossakin.
+
+Aseta `.env`:iin esim.:
+
+```
+WATCHED_WALLETS=Fg6PaFpo...,9WzDXwBb...
+```
 
 ## Turvamekanismit
 

@@ -31,6 +31,10 @@ const schema = z.object({
   SCAN_INTERVAL_SECONDS: z.coerce.number().positive().default(45),
   DEXSCREENER_CHAIN: z.string().default("solana"),
 
+  // Pilkulla erotettu lista Solana-lompakko-osoitteita joita seurataan
+  // copy-trade-signaalia varten. Tyhjana (oletus) ominaisuus ei tee mitaan.
+  WATCHED_WALLETS: z.string().default(""),
+
   PORT: z.coerce.number().positive().default(3300),
 });
 

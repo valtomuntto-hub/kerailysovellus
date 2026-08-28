@@ -30,4 +30,6 @@ export interface FeatureVector {
   buySellRatio1h: number;
   liquidityUsd: number;
   ageMinutes: number;
+  /** 0-1: kuinka vahva copy-trade-signaali (seurattujen lompakoiden hallussapito). 0 = ei seurantaa/ei havaintoa. */
+  copyTradeSignal: number;
 }

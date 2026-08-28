@@ -6,6 +6,7 @@ import { logger } from "../logger.js";
 import * as db from "../persistence/db.js";
 import { getSolBalance } from "../wallet.js";
 import { fetchPairsForMints } from "../data/dexscreener.js";
+import { parseWatchedWallets } from "../data/walletTracker.js";
 import type { TradeEngine } from "../execution/tradeEngine.js";
 import { MODEL_INPUT_LABELS } from "../strategy/features.js";
 
@@ -45,6 +46,7 @@ export function startServer(engine: TradeEngine): void {
         weights: engine.learner.weights,
         weightLabels: MODEL_INPUT_LABELS,
       },
+      watchedWalletsCount: parseWatchedWallets().length,
     });
   });
 

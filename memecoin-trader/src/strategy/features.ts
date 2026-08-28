@@ -1,4 +1,5 @@
 import { pairAgeMinutes } from "../data/dexscreener.js";
+import type { CopyTradeInfo } from "../persistence/db.js";
 import type { FeatureVector, TokenPair } from "../types.js";
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -10,7 +11,20 @@ function buySellRatio(buys: number, sells: number): number {
   return (buys - sells) / Math.max(buys + sells, 1);
 }
 
-export function computeFeatures(pair: TokenPair): FeatureVector {
+/**
+ * Copy-trade-piirre: yhdistaa "kuinka moni seurattu lompakko pitaa tata
+ * hallussaan" (breadth) ja "kuinka tuoreesti tama havaittiin" (freshness,
+ * vanhenee ~2h:ssa). Palauttaa 0 jos seurantaa ei ole tai kukaan seuratuista
+ * ei pida tokenia.
+ */
+function copyTradeScore(info?: CopyTradeInfo): number {
+  if (!info || info.watchedByCount === 0) return 0;
+  const freshness = clamp(1 - info.minFirstSeenMinutesAgo / 120, 0, 1);
+  const breadth = clamp(info.watchedByCount / 3, 0, 1);
+  return clamp(freshness * 0.7 + breadth * 0.3, 0, 1);
+}
+
+export function computeFeatures(pair: TokenPair, copyTrade?: CopyTradeInfo): FeatureVector {
   const liq = Math.max(pair.liquidity.usd, 1);
   return {
     momentum5m: clamp(pair.priceChange.m5 / 100, -1, 3),
@@ -20,6 +34,7 @@ export function computeFeatures(pair: TokenPair): FeatureVector {
     buySellRatio1h: buySellRatio(pair.txns.h1.buys, pair.txns.h1.sells),
     liquidityUsd: pair.liquidity.usd,
     ageMinutes: pairAgeMinutes(pair),
+    copyTradeSignal: copyTradeScore(copyTrade),
   };
 }
 
@@ -38,6 +53,7 @@ export function toModelInput(f: FeatureVector): number[] {
     f.buySellRatio5m,
     f.buySellRatio1h,
     Math.tanh(f.ageMinutes / 720), // ~puoli paivaa -> saturoituu lahella 1:ta
+    f.copyTradeSignal,
   ];
 }
 
@@ -49,4 +65,5 @@ export const MODEL_INPUT_LABELS = [
   "osto/myynti_5m",
   "osto/myynti_1h",
   "ika",
+  "copy-trade",
 ];

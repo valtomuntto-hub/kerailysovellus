@@ -52,6 +52,14 @@ CREATE TABLE IF NOT EXISTS learner_state (
   updated_at INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS wallet_sightings (
+  wallet TEXT NOT NULL,
+  mint TEXT NOT NULL,
+  first_seen INTEGER NOT NULL,
+  last_seen INTEGER NOT NULL,
+  PRIMARY KEY (wallet, mint)
+);
+
 CREATE TABLE IF NOT EXISTS daily_stats (
   day TEXT PRIMARY KEY,
   realized_pnl_sol REAL NOT NULL DEFAULT 0,
@@ -230,6 +238,71 @@ export function saveLearnerState(state: LearnerState): void {
       trained_examples = excluded.trained_examples,
       updated_at = excluded.updated_at
   `).run(JSON.stringify(state.weights), state.trainedExamples, state.updatedAt);
+}
+
+// ---------------------------------------------------------------------------
+// Seurattujen lompakoiden havainnot (copy-trade-signaali)
+// ---------------------------------------------------------------------------
+
+export interface CopyTradeInfo {
+  watchedByCount: number;
+  minFirstSeenMinutesAgo: number;
+}
+
+/**
+ * Paivittaa lompakkohavainnot nykyhetkeen ja palauttaa per-mint yhteenvedon
+ * oppivaa mallia varten: kuinka moni seurattu lompakko pitaa tokenia
+ * hallussaan juuri nyt, ja kuinka kauan aikaa sitten aikaisin naista
+ * havaittiin ensimmaisen kerran pitamassa sita (tuoreus-signaali).
+ *
+ * Jos lompakko ei enaa pida jotain aiemmin havaittua tokenia (myyty), sen
+ * havainto poistetaan - jos sama lompakko ostaa saman tokenin uudelleen
+ * myohemmin, se lasketaan taas "tuoreeksi" havainnoksi.
+ */
+export function syncWalletSightingsAndGetSignals(holdingsByWallet: Map<string, string[]>): Map<string, CopyTradeInfo> {
+  const now = Date.now();
+  const selectStmt = db.prepare(`SELECT first_seen FROM wallet_sightings WHERE wallet = ? AND mint = ?`);
+  const insertStmt = db.prepare(`INSERT INTO wallet_sightings (wallet, mint, first_seen, last_seen) VALUES (?, ?, ?, ?)`);
+  const updateStmt = db.prepare(`UPDATE wallet_sightings SET last_seen = ? WHERE wallet = ? AND mint = ?`);
+  const prevMintsForWallet = db.prepare(`SELECT mint FROM wallet_sightings WHERE wallet = ?`);
+  const deleteStmt = db.prepare(`DELETE FROM wallet_sightings WHERE wallet = ? AND mint = ?`);
+
+  const byMint = new Map<string, { count: number; earliestFirstSeen: number }>();
+
+  for (const [wallet, mints] of holdingsByWallet) {
+    const currentSet = new Set(mints);
+
+    // Siivoa pois tokenit joita lompakko ei enaa pida hallussaan.
+    const prevRows = prevMintsForWallet.all(wallet) as any[];
+    for (const row of prevRows) {
+      if (!currentSet.has(row.mint)) deleteStmt.run(wallet, row.mint);
+    }
+
+    for (const mint of mints) {
+      const existing = selectStmt.get(wallet, mint) as any;
+      let firstSeen: number;
+      if (existing) {
+        firstSeen = existing.first_seen;
+        updateStmt.run(now, wallet, mint);
+      } else {
+        firstSeen = now;
+        insertStmt.run(wallet, mint, now, now);
+      }
+
+      const agg = byMint.get(mint);
+      if (!agg) byMint.set(mint, { count: 1, earliestFirstSeen: firstSeen });
+      else {
+        agg.count += 1;
+        agg.earliestFirstSeen = Math.min(agg.earliestFirstSeen, firstSeen);
+      }
+    }
+  }
+
+  const result = new Map<string, CopyTradeInfo>();
+  for (const [mint, v] of byMint) {
+    result.set(mint, { watchedByCount: v.count, minFirstSeenMinutesAgo: (now - v.earliestFirstSeen) / 60_000 });
+  }
+  return result;
 }
 
 // ---------------------------------------------------------------------------

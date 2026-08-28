@@ -4,6 +4,7 @@ import { logger } from "../logger.js";
 import { getSolBalance } from "../wallet.js";
 import { fetchPairsForMints, pairAgeMinutes } from "../data/dexscreener.js";
 import { getCandidateUniverse } from "../data/tokenUniverse.js";
+import { fetchWatchedWalletHoldings, parseWatchedWallets } from "../data/walletTracker.js";
 import { computeFeatures, toModelInput } from "../strategy/features.js";
 import { OnlineLearner } from "../strategy/learner.js";
 import { checkTokenSafety } from "../safety/tokenSafety.js";
@@ -20,6 +21,7 @@ import type { TokenPair } from "../types.js";
 export class TradeEngine {
   learner: OnlineLearner;
   private currentSolUsd = 150; // fallback-arvo, paivitetaan joka kierroksella
+  private copyTradeSignals = new Map<string, db.CopyTradeInfo>();
 
   constructor() {
     this.learner = new OnlineLearner(db.loadLearnerState());
@@ -29,10 +31,23 @@ export class TradeEngine {
     logger.info("--- Uusi tarkistuskierros ---");
     try {
       this.currentSolUsd = await this.fetchSolUsdPrice();
+      this.copyTradeSignals = await this.refreshCopyTradeSignals();
       await this.manageOpenPositions();
       await this.scanForEntries();
     } catch (err) {
       logger.error("Virhe tarkistuskierroksella", err);
+    }
+  }
+
+  /** Paivittaa seurattujen lompakoiden (WATCHED_WALLETS) hallussapidon ja palauttaa per-mint copy-trade-signaalin. */
+  private async refreshCopyTradeSignals(): Promise<Map<string, db.CopyTradeInfo>> {
+    if (parseWatchedWallets().length === 0) return new Map();
+    try {
+      const holdings = await fetchWatchedWalletHoldings();
+      return db.syncWalletSightingsAndGetSignals(holdings);
+    } catch (err) {
+      logger.warn("Seurattujen lompakoiden haku epaonnistui talla kierroksella", err);
+      return this.copyTradeSignals; // pidetaan edellinen tunnettu tila mieluummin kuin nollataan
     }
   }
 
@@ -72,7 +87,8 @@ export class TradeEngine {
       } else if (heldMinutes >= config.MAX_HOLD_MINUTES) {
         exitReason = `max hold time (${heldMinutes.toFixed(0)} min)`;
       } else {
-        const score = this.learner.score(toModelInput(computeFeatures(pair)));
+        const features = computeFeatures(pair, this.copyTradeSignals.get(pos.mint));
+        const score = this.learner.score(toModelInput(features));
         if (score < config.SELL_SCORE_THRESHOLD) {
           exitReason = `mallin pisteet laskivat (${score.toFixed(2)})`;
         }
@@ -165,7 +181,8 @@ export class TradeEngine {
       .map((pair) => {
         const ageMinutes = pairAgeMinutes(pair);
         const marketFilter = riskManager.passesMarketFilters(pair.liquidity.usd, ageMinutes);
-        const input = toModelInput(computeFeatures(pair));
+        const features = computeFeatures(pair, this.copyTradeSignals.get(pair.baseToken.address));
+        const input = toModelInput(features);
         const score = this.learner.score(input);
         return { pair, marketFilter, input, score };
       })
