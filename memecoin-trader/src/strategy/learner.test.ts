@@ -11,13 +11,13 @@ describe("OnlineLearner", () => {
 
   it("score() palauttaa aina arvon valilta (0, 1)", () => {
     const learner = new OnlineLearner();
-    const score = learner.score([1, 0.5, 0.3, 0.2, 0.1, 0.1, 0.5, 0]);
+    const score = learner.score(new Array(FEATURE_COUNT).fill(0.3));
     assert.ok(score > 0 && score < 1, `pisteiden pitaisi olla 0-1 valilla, saatiin ${score}`);
   });
 
   it("oppii nostamaan pisteita kun samasta syotteesta toistuu voitollinen tulos", () => {
     const learner = new OnlineLearner();
-    const input = [1, 1, 1, 1, 1, 1, 1, 1];
+    const input = new Array(FEATURE_COUNT).fill(1);
     const before = learner.score(input);
     for (let i = 0; i < 50; i++) learner.update(input, 1);
     const after = learner.score(input);
@@ -27,7 +27,7 @@ describe("OnlineLearner", () => {
 
   it("oppii laskemaan pisteita kun samasta syotteesta toistuu tappiollinen tulos", () => {
     const learner = new OnlineLearner();
-    const input = [1, 1, 1, 1, 1, 1, 1, 1];
+    const input = new Array(FEATURE_COUNT).fill(1);
     for (let i = 0; i < 50; i++) learner.update(input, 0);
     const after = learner.score(input);
     assert.ok(after < 0.1, `toistuvan tappiollisen signaalin pisteiden pitaisi lahestya 0:aa, saatiin ${after}`);
@@ -35,8 +35,9 @@ describe("OnlineLearner", () => {
 
   it("kasvattaa trainedExamples-laskuria jokaisella update()-kutsulla", () => {
     const learner = new OnlineLearner();
-    learner.update([1, 0, 0, 0, 0, 0, 0, 0], 1);
-    learner.update([1, 0, 0, 0, 0, 0, 0, 0], 0);
+    const zeroInput = new Array(FEATURE_COUNT).fill(0);
+    learner.update(zeroInput, 1);
+    learner.update(zeroInput, 0);
     assert.equal(learner.trainedExamples, 2);
   });
 

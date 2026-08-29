@@ -51,6 +51,7 @@ src/
     dexscreener.ts         Markkinadata: hinnat, volyymi, likviditeetti, ika
     tokenUniverse.ts        Trendaavien tokenien kandidaattijoukko
     walletTracker.ts         Seurattujen lompakoiden (WATCHED_WALLETS) hallussapito
+    twitterSignal.ts          X (Twitter) -integraatio (valinnainen)
   strategy/
     features.ts             Raakadatasta piirrevektoriksi mallille
     learner.ts               Online-logistinen regressio - "oppiva" osto/myyntimalli
@@ -150,13 +151,14 @@ oleminen oli vahinko.
 
 Malli on **online-logistinen regressio** (`src/strategy/learner.ts`) - lineaarinen
 malli joka antaa 0-1 -pisteet sille kuinka todennakoisesti kauppa olisi
-voitollinen, kahdeksasta piirteesta:
+voitollinen, yhdeksasta piirteesta:
 
 - hintamomentum 5 min ja 1 h
 - volyymi suhteessa likviditeettiin
 - osto/myyntipaine (tx-maarat) 5 min ja 1 h
 - parin ika
 - copy-trade-signaali (katso "Copy-trading" alla) - 0 jos `WATCHED_WALLETS` on tyhja
+- X (Twitter) -signaali (katso alla) - 0 jos `TWITTER_BEARER_TOKEN` on tyhja
 
 Kun positio suljetaan (voitolla tai tappiolla), botti paivittaa painoja
 stokastisella gradienttinousulla sen mukaan mika piirre ennusti lopputulosta
@@ -203,6 +205,52 @@ Aseta `.env`:iin esim.:
 ```
 WATCHED_WALLETS=Fg6PaFpo...,9WzDXwBb...
 ```
+
+## X (Twitter) -signaali (valinnainen lisasignaali)
+
+Voit seurata valitsemiasi X-tileja (esim. vaikutusvaltaisia henkiloita).
+Kun seurattu tili twiittaa jotain kryptoon viittaavaa, botti nostaa sen
+mukaan osuvien (tai jos maininta oli geneerinen, kaikkien) kandidaattien
+pisteita mallissa - sama periaate kuin copy-tradingissa: EI ohita
+suodattimia eika riskirajoja, ja malli oppii ajan myota kuinka paljon
+signaaliin kannattaa luottaa.
+
+### Kayttoonotto
+
+1. Mene [developer.x.com](https://developer.x.com) ja luo kehittajatili + App
+2. Luo **Bearer Token** sille Appille
+3. **Aseta kulukatto** X:n kehittajapaneelista ennenkuin otat taman kayttoon -
+   helmikuusta 2026 alkaen X:n oletushinnoittelu uusille kehittajille on
+   "pay-per-use" (n. 0.005 $ per luettu twiitti, ei enaa pakollista 200 $/kk
+   -tilausta), mutta ilman kulukattoa lasku voi kasvaa jos jotain menee
+   pieleen (esim. liian tiheta pollausta)
+4. `.env`:iin:
+   ```
+   TWITTER_BEARER_TOKEN=<oma-bearer-token>
+   TWITTER_WATCHED_HANDLES=realDonaldTrump,elonmusk
+   TWITTER_POLL_INTERVAL_SECONDS=120
+   ```
+
+### Miten se toimii - ja mita se EI tee
+
+- Botti tarkistaa uudet twiitit **harvemmin** kuin markkinaskannauksen
+  (oletus 120s vs. 45s) - jokainen X API-kutsu maksaa oikeaa rahaa, joten
+  tata ei pollata joka kierroksella.
+- Poimii twiiteista `$CASHTAGIT` (esim. `$TRUMP` -> tarkka osuma sen
+  tickerin tokeneille) ja yleiset kryptoavainsanat (esim. "crypto",
+  "bitcoin" -> geneerinen, lievempi boost kaikille kandidaateille tunnin
+  ajan). **Tama on yksinkertainen avainsanahaku, ei tekoalypohjaista
+  sentimenttianalyysia** - lapinakyvaa siita mita se oikeasti tekee.
+- Signaali haihtuu nopeasti (~1h) - twiitin markkinavaikutus on tyypillisesti
+  hyvin lyhytaikainen.
+- **Ticker ei ole yksiselitteinen tunniste.** Moni scam-token nimeaa itsensa
+  tarkoituksella samaksi kuin suositut tickerit ($TRUMP, $PEPE ym.) juuri
+  kaapatakseen taman kaltaisen hypepohjaisen huomion - "$TRUMP mainittu"
+  voi osua ihan eri (ja huonompaan) tokeniin kuin mita twiitissa oikeasti
+  tarkoitettiin. Turvasuodattimet (mint/freeze-authority) pysyvat silti
+  voimassa, mutta tama epaselvyys on hyva tiedostaa.
+- Tyhjana (`TWITTER_BEARER_TOKEN` tyhja) ominaisuus ei tee mitaan eika
+  maksa mitaan.
 
 ## Turvamekanismit
 

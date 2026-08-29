@@ -7,6 +7,7 @@ import * as db from "../persistence/db.js";
 import { getSolBalance } from "../wallet.js";
 import { fetchPairsForMints } from "../data/dexscreener.js";
 import { parseWatchedWallets } from "../data/walletTracker.js";
+import { isEnabled as isTwitterEnabled, parseWatchedHandles } from "../data/twitterSignal.js";
 import type { TradeEngine } from "../execution/tradeEngine.js";
 import { MODEL_INPUT_LABELS } from "../strategy/features.js";
 
@@ -47,6 +48,8 @@ export function startServer(engine: TradeEngine): void {
         weightLabels: MODEL_INPUT_LABELS,
       },
       watchedWalletsCount: parseWatchedWallets().length,
+      twitterEnabled: isTwitterEnabled(),
+      watchedTwitterHandlesCount: parseWatchedHandles().length,
     });
   });
 

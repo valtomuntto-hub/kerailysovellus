@@ -51,6 +51,22 @@ describe("computeFeatures", () => {
     const many = computeFeatures(makePair(), { watchedByCount: 3, minFirstSeenMinutesAgo: 60 });
     assert.ok(many.copyTradeSignal > one.copyTradeSignal);
   });
+
+  it("twitterSignal on 0 kun twitter-tietoa ei anneta", () => {
+    const f = computeFeatures(makePair());
+    assert.equal(f.twitterSignal, 0);
+  });
+
+  it("twitterSignal on suurempi juuri twiitatulle kuin vanhalle maininnalle", () => {
+    const fresh = computeFeatures(makePair(), undefined, { minMinutesAgo: 0, handle: "someone" });
+    const old = computeFeatures(makePair(), undefined, { minMinutesAgo: 55, handle: "someone" });
+    assert.ok(fresh.twitterSignal > old.twitterSignal);
+  });
+
+  it("twitterSignal haihtuu nollaan tunnin jalkeen", () => {
+    const f = computeFeatures(makePair(), undefined, { minMinutesAgo: 120, handle: "someone" });
+    assert.equal(f.twitterSignal, 0);
+  });
 });
 
 describe("toModelInput", () => {

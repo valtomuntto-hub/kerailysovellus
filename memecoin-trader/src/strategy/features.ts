@@ -1,5 +1,5 @@
 import { pairAgeMinutes } from "../data/dexscreener.js";
-import type { CopyTradeInfo } from "../persistence/db.js";
+import type { CopyTradeInfo, TwitterSignalInfo } from "../persistence/db.js";
 import type { FeatureVector, TokenPair } from "../types.js";
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -24,7 +24,18 @@ function copyTradeScore(info?: CopyTradeInfo): number {
   return clamp(freshness * 0.7 + breadth * 0.3, 0, 1);
 }
 
-export function computeFeatures(pair: TokenPair, copyTrade?: CopyTradeInfo): FeatureVector {
+/**
+ * X (Twitter) -piirre: tuoreen, seuratulta tililta tulleen kryptomaininnan
+ * (tarkka tokenin ticker tai geneerinen kryptomaininta) voimakkuus.
+ * Vanhenee nopeammin kuin copy-trade (~1h) - twiitin vaikutus markkinaan on
+ * tyypillisesti hyvin lyhytaikainen.
+ */
+function twitterScore(info?: TwitterSignalInfo): number {
+  if (!info) return 0;
+  return clamp(1 - info.minMinutesAgo / 60, 0, 1);
+}
+
+export function computeFeatures(pair: TokenPair, copyTrade?: CopyTradeInfo, twitter?: TwitterSignalInfo): FeatureVector {
   const liq = Math.max(pair.liquidity.usd, 1);
   return {
     momentum5m: clamp(pair.priceChange.m5 / 100, -1, 3),
@@ -35,6 +46,7 @@ export function computeFeatures(pair: TokenPair, copyTrade?: CopyTradeInfo): Fea
     liquidityUsd: pair.liquidity.usd,
     ageMinutes: pairAgeMinutes(pair),
     copyTradeSignal: copyTradeScore(copyTrade),
+    twitterSignal: twitterScore(twitter),
   };
 }
 
@@ -54,6 +66,7 @@ export function toModelInput(f: FeatureVector): number[] {
     f.buySellRatio1h,
     Math.tanh(f.ageMinutes / 720), // ~puoli paivaa -> saturoituu lahella 1:ta
     f.copyTradeSignal,
+    f.twitterSignal,
   ];
 }
 
@@ -66,4 +79,5 @@ export const MODEL_INPUT_LABELS = [
   "osto/myynti_1h",
   "ika",
   "copy-trade",
+  "twitter/X",
 ];

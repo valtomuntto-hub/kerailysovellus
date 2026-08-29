@@ -1,6 +1,6 @@
 import { logger } from "../logger.js";
 
-export const FEATURE_COUNT = 8;
+export const FEATURE_COUNT = 9;
 const LEARNING_RATE = 0.05;
 const L2_REG = 0.001;
 
@@ -64,10 +64,10 @@ export class OnlineLearner {
 }
 
 function defaultWeights(): number[] {
-  // [bias, momentum_5m, momentum_1h, vol/likviditeetti, osto/myynti_5m, osto/myynti_1h, ika, copy-trade]
-  // Lievasti momentum-, ostopaine- ja copy-trade-painotteinen lahtoarvaus
-  // ennen kuin oma kaupankayntihistoria opettaa painot uusiksi.
-  return [-0.5, 0.8, 0.6, 0.4, 0.5, 0.3, 0.1, 0.5];
+  // [bias, momentum_5m, momentum_1h, vol/likviditeetti, osto/myynti_5m, osto/myynti_1h, ika, copy-trade, twitter/X]
+  // Lievasti momentum-, ostopaine-, copy-trade- ja twitter-painotteinen
+  // lahtoarvaus ennen kuin oma kaupankayntihistoria opettaa painot uusiksi.
+  return [-0.5, 0.8, 0.6, 0.4, 0.5, 0.3, 0.1, 0.5, 0.5];
 }
 
 function dot(a: number[], b: number[]): number {

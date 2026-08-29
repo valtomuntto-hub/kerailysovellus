@@ -32,4 +32,6 @@ export interface FeatureVector {
   ageMinutes: number;
   /** 0-1: kuinka vahva copy-trade-signaali (seurattujen lompakoiden hallussapito). 0 = ei seurantaa/ei havaintoa. */
   copyTradeSignal: number;
+  /** 0-1: kuinka tuore ja vahva X (Twitter) -maininta seuratulta tililta. 0 = ei seurantaa/ei havaintoa. */
+  twitterSignal: number;
 }

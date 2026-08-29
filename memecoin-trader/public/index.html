@@ -102,6 +102,7 @@
     <div class="stat"><div class="label">Botti pysahdyksissa</div><div class="value mono" id="statHalted">-</div></div>
     <div class="stat"><div class="label">Avoimet positiot</div><div class="value mono" id="statOpenCount">-</div></div>
     <div class="stat"><div class="label">Seuratut lompakot</div><div class="value mono" id="statWatched">-</div></div>
+    <div class="stat"><div class="label">Seuratut X-tilit</div><div class="value mono" id="statTwitter">-</div></div>
   </div>
 </div>
 
@@ -172,6 +173,7 @@ function renderStatus(s) {
   pnlEl.className = "value mono " + cls(s.today.realizedPnlSol);
   document.getElementById("statTrades").textContent = s.today.tradesCount;
   document.getElementById("statWatched").textContent = s.watchedWalletsCount ?? 0;
+  document.getElementById("statTwitter").textContent = s.twitterEnabled ? (s.watchedTwitterHandlesCount ?? 0) : "pois paalta";
   document.getElementById("statHalted").textContent = s.today.halted ? "KYLLA" : "ei";
 
   document.getElementById("learnerMeta").textContent =

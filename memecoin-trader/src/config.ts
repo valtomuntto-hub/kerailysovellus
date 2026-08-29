@@ -35,6 +35,16 @@ const schema = z.object({
   // copy-trade-signaalia varten. Tyhjana (oletus) ominaisuus ei tee mitaan.
   WATCHED_WALLETS: z.string().default(""),
 
+  // X (Twitter) -signaali: valinnainen, tyhjana pois paalta. Vaatii oman
+  // X-kehittajatilin ja Bearer-tokenin (developer.x.com, "pay-per-use" -
+  // hinnoittelu, ei enaa pakollista kk-tilausta). Katso README.
+  TWITTER_BEARER_TOKEN: z.string().default(""),
+  // Pilkulla erotettu lista kayttajatunnuksia (ilman @) joita seurataan.
+  TWITTER_WATCHED_HANDLES: z.string().default(""),
+  // Kuinka usein X:aa saa kysella - pidetaan harvempana kuin markkina-
+  // skannaus, koska jokainen kysely maksaa oikeaa rahaa.
+  TWITTER_POLL_INTERVAL_SECONDS: z.coerce.number().positive().default(120),
+
   PORT: z.coerce.number().positive().default(3300),
 });
 

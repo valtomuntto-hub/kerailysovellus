@@ -67,6 +67,19 @@ CREATE TABLE IF NOT EXISTS wallet_sightings (
   PRIMARY KEY (wallet, mint)
 );
 
+CREATE TABLE IF NOT EXISTS twitter_last_seen (
+  handle TEXT PRIMARY KEY,
+  last_tweet_id TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS twitter_signals (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  handle TEXT NOT NULL,
+  tweet_id TEXT NOT NULL,
+  symbol TEXT,
+  timestamp INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS daily_stats (
   day TEXT PRIMARY KEY,
   realized_pnl_sol REAL NOT NULL DEFAULT 0,
@@ -310,6 +323,55 @@ export function syncWalletSightingsAndGetSignals(holdingsByWallet: Map<string, s
     result.set(mint, { watchedByCount: v.count, minFirstSeenMinutesAgo: (now - v.earliestFirstSeen) / 60_000 });
   }
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// X (Twitter) -signaali
+// ---------------------------------------------------------------------------
+
+export function getTwitterLastSeenIds(): Map<string, string> {
+  const rows = db.prepare(`SELECT handle, last_tweet_id FROM twitter_last_seen`).all() as any[];
+  return new Map(rows.map((r) => [r.handle, r.last_tweet_id]));
+}
+
+export function setTwitterLastSeen(handle: string, tweetId: string): void {
+  db.prepare(`
+    INSERT INTO twitter_last_seen (handle, last_tweet_id) VALUES (?, ?)
+    ON CONFLICT(handle) DO UPDATE SET last_tweet_id = excluded.last_tweet_id
+  `).run(handle, tweetId);
+}
+
+/** symbol=null tallentaa "geneerisen" kryptomaininnan (koskee kaikkia ehdokkaita). */
+export function insertTwitterSignal(handle: string, tweetId: string, symbol: string | null, timestamp: number): void {
+  db.prepare(`INSERT INTO twitter_signals (handle, tweet_id, symbol, timestamp) VALUES (?, ?, ?, ?)`).run(
+    handle,
+    tweetId,
+    symbol,
+    timestamp
+  );
+}
+
+export interface TwitterSignalInfo {
+  minMinutesAgo: number;
+  handle: string;
+}
+
+/**
+ * Tuorein relevantti twiitti annetulle symbolille (tarkka osuma) TAI
+ * geneerinen kryptomaininta (symbol IS NULL, koskee kaikkia), tietyn
+ * aikaikkunan sisalla. Palauttaa undefined jos ei osumia.
+ */
+export function getTwitterSignalForSymbol(symbol: string, windowMinutes = 60): TwitterSignalInfo | undefined {
+  const cutoff = Date.now() - windowMinutes * 60_000;
+  const row = db
+    .prepare(
+      `SELECT handle, timestamp FROM twitter_signals
+       WHERE timestamp >= ? AND (symbol = ? OR symbol IS NULL)
+       ORDER BY timestamp DESC LIMIT 1`
+    )
+    .get(cutoff, symbol.toUpperCase()) as any;
+  if (!row) return undefined;
+  return { minMinutesAgo: (Date.now() - row.timestamp) / 60_000, handle: row.handle };
 }
 
 // ---------------------------------------------------------------------------

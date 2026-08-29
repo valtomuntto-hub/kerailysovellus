@@ -5,6 +5,7 @@ import { getSolBalance } from "../wallet.js";
 import { fetchPairsForMints, pairAgeMinutes } from "../data/dexscreener.js";
 import { getCandidateUniverse } from "../data/tokenUniverse.js";
 import { fetchWatchedWalletHoldings, parseWatchedWallets } from "../data/walletTracker.js";
+import { fetchNewRelevantTweets, isEnabled as isTwitterEnabled } from "../data/twitterSignal.js";
 import { computeFeatures, toModelInput } from "../strategy/features.js";
 import { OnlineLearner } from "../strategy/learner.js";
 import { checkTokenSafety } from "../safety/tokenSafety.js";
@@ -22,6 +23,7 @@ export class TradeEngine {
   learner: OnlineLearner;
   private currentSolUsd = 150; // fallback-arvo, paivitetaan joka kierroksella
   private copyTradeSignals = new Map<string, db.CopyTradeInfo>();
+  private lastTwitterPollMs = 0;
 
   constructor() {
     this.learner = new OnlineLearner(db.loadLearnerState());
@@ -32,6 +34,7 @@ export class TradeEngine {
     try {
       this.currentSolUsd = await this.fetchSolUsdPrice();
       this.copyTradeSignals = await this.refreshCopyTradeSignals();
+      await this.pollTwitterIfDue();
       await this.manageOpenPositions();
       await this.scanForEntries();
     } catch (err) {
@@ -48,6 +51,42 @@ export class TradeEngine {
     } catch (err) {
       logger.warn("Seurattujen lompakoiden haku epaonnistui talla kierroksella", err);
       return this.copyTradeSignals; // pidetaan edellinen tunnettu tila mieluummin kuin nollataan
+    }
+  }
+
+  /**
+   * Kyselee X:aa vain harvakseltaan (TWITTER_POLL_INTERVAL_SECONDS) - jokainen
+   * kysely maksaa oikeaa rahaa, joten tata ei tehda joka 45s-kierroksella.
+   */
+  private async pollTwitterIfDue(): Promise<void> {
+    if (!isTwitterEnabled()) return;
+    const elapsedMs = Date.now() - this.lastTwitterPollMs;
+    if (elapsedMs < config.TWITTER_POLL_INTERVAL_SECONDS * 1000) return;
+    this.lastTwitterPollMs = Date.now();
+
+    try {
+      const sinceIds = db.getTwitterLastSeenIds();
+      const { relevant, latestSeenIds } = await fetchNewRelevantTweets(sinceIds);
+
+      for (const tweet of relevant) {
+        if (tweet.mentionedSymbols.length > 0) {
+          for (const symbol of tweet.mentionedSymbols) {
+            db.insertTwitterSignal(tweet.handle, tweet.tweetId, symbol, tweet.createdAt);
+          }
+        } else if (tweet.genericCryptoMention) {
+          db.insertTwitterSignal(tweet.handle, tweet.tweetId, null, tweet.createdAt);
+        }
+        logger.info(
+          `X-signaali: @${tweet.handle} mainitsi ${tweet.mentionedSymbols.length > 0 ? tweet.mentionedSymbols.join(", ") : "kryptoa yleisesti"}`
+        );
+      }
+
+      // Aina eteenpain viimeksi NAHTYYN (ei vain relevanttiin) - ei osteta samoja epaolennaisia twiitteja uudelleen.
+      for (const [handle, tweetId] of latestSeenIds) {
+        db.setTwitterLastSeen(handle, tweetId);
+      }
+    } catch (err) {
+      logger.warn("X:n kysely epaonnistui talla kierroksella", err);
     }
   }
 
@@ -87,7 +126,8 @@ export class TradeEngine {
       } else if (heldMinutes >= config.MAX_HOLD_MINUTES) {
         exitReason = `max hold time (${heldMinutes.toFixed(0)} min)`;
       } else {
-        const features = computeFeatures(pair, this.copyTradeSignals.get(pos.mint));
+        const twitterSignal = db.getTwitterSignalForSymbol(pos.symbol);
+        const features = computeFeatures(pair, this.copyTradeSignals.get(pos.mint), twitterSignal);
         const score = this.learner.score(toModelInput(features));
         if (score < config.SELL_SCORE_THRESHOLD) {
           exitReason = `mallin pisteet laskivat (${score.toFixed(2)})`;
@@ -181,7 +221,8 @@ export class TradeEngine {
       .map((pair) => {
         const ageMinutes = pairAgeMinutes(pair);
         const marketFilter = riskManager.passesMarketFilters(pair.liquidity.usd, ageMinutes);
-        const features = computeFeatures(pair, this.copyTradeSignals.get(pair.baseToken.address));
+        const twitterSignal = db.getTwitterSignalForSymbol(pair.baseToken.symbol);
+        const features = computeFeatures(pair, this.copyTradeSignals.get(pair.baseToken.address), twitterSignal);
         const input = toModelInput(features);
         const score = this.learner.score(input);
         return { pair, marketFilter, input, score };
