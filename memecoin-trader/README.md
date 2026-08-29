@@ -80,13 +80,32 @@ cp .env.example .env
 
 ### 2) Solana-lompakko
 
-Suositus: luo **uusi, erillinen lompakko** pelkastaan botille (esim. Phantomissa
-"Lisaa/yhdista lompakko" -> "Luo uusi lompakko"), ja siirra siihen vain se
-summa SOL:aa jonka olet valmis havitmaan kokonaan.
+Suositus: kayta **uutta, erillista lompakkoa** pelkastaan botille, ja siirra
+siihen vain se summa SOL:aa jonka olet valmis havitmaan kokonaan. Kaksi tapaa
+saada sille yksityinen avain:
 
-Vie lompakon yksityinen avain Phantomista:
+**Vaihtoehto A - luo suoraan komentorivilta (ei riipu Phantomista):**
+
+```bash
+npm run generate-wallet
+```
+
+Tulostaa uuden Solana-osoitteen ja sen yksityisen avaimen suoraan
+terminaaliin. Kopioi yksityinen avain `.env`:iin (katso alla), ja laheta
+julkiseen osoitteeseen SOL:aa esim. omasta Phantom-lompakostasi tavallisena
+"Send"-toimintona (tama ei vaadi yksityista avainta). Talle ikkunalle ei
+tarvita Phantomia lainkaan - hyodyllinen jos Phantomin oma "Show Private
+Key" -nakyma jumittaa tai tili on Ledger/laitelompakko (jolloin avainta ei
+voi vieda ollenkaan, koska se ei koskaan poistu laitteesta).
+
+**Vaihtoehto B - vie Phantomista:**
+
+Phantomissa "Lisaa/yhdista lompakko" -> "Luo uusi lompakko", sitten
 `Asetukset -> Turvallisuus ja tietosuoja -> Nayta yksityinen avain` (base58-
-muotoinen merkkijono) ja liita se `.env`-tiedoston `WALLET_PRIVATE_KEY`-riville.
+muotoinen merkkijono, EI 12/24 sanan palautuslause).
+
+Kummalla tavalla tahansa saatu avain liitetaan `.env`-tiedoston
+`WALLET_PRIVATE_KEY`-riville.
 
 **Ala koskaan** jaa tata avainta kenellekaan tai committaa `.env`-tiedostoa
 gittiin (juuren `.gitignore` estaa taman jo oletuksena).

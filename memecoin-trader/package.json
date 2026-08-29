@@ -10,7 +10,8 @@
     "build": "tsc -p tsconfig.json",
     "start:built": "node dist/index.js",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/strategy/learner.test.ts src/strategy/features.test.ts src/execution/riskManager.test.ts"
+    "test": "node --import tsx --test src/strategy/learner.test.ts src/strategy/features.test.ts src/execution/riskManager.test.ts",
+    "generate-wallet": "node scripts/generate-wallet.mjs"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.9",
