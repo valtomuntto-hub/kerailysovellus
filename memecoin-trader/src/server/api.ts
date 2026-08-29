@@ -65,7 +65,11 @@ export function startServer(engine: TradeEngine): void {
     res.json(db.getRecentTrades(100));
   });
 
-  app.listen(config.PORT, () => {
+  // Sidotaan eksplisiittisesti 127.0.0.1:aan (ei 0.0.0.0/::) - tama on
+  // henkilokohtainen, autentikoimaton dashboard eika sen pida nakya
+  // verkkoon, ja eksplisiittinen osoite valttaa Windowsilla joskus
+  // esiintyvat IPv4/IPv6-oletussidonnan sekaannukset.
+  app.listen(config.PORT, "127.0.0.1", () => {
     logger.info(`Dashboard kaynnissa: http://localhost:${config.PORT}`);
   });
 }
