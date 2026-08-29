@@ -1,14 +1,21 @@
-import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 
+// Kaytetaan Node.js:n SISAANRAKENNETTUA SQLite-tukea (node:sqlite) eika
+// better-sqlite3-riippuvuutta: better-sqlite3 on natiivi C++-moduuli joka
+// pitaa kaantaa asennuksen yhteydessa, mika vaatii Visual Studio Build
+// Tools -tyokalut Windowsilla (tai vastaavat Mac/Linuxilla) jos valmista
+// esikaannettya versiota ei loydy kaytossa olevalle Node-versiolle.
+// node:sqlite on mukana Node itsessaan (Node 22.5+), joten taalla ei ole
+// mitaan kaannettavaa - toimii samalla tavalla joka koneella.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.resolve(__dirname, "../../data");
 fs.mkdirSync(dataDir, { recursive: true });
 
-const db = new Database(path.join(dataDir, "trader.db"));
-db.pragma("journal_mode = WAL");
+const db = new DatabaseSync(path.join(dataDir, "trader.db"));
+db.exec("PRAGMA journal_mode = WAL;");
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS positions (

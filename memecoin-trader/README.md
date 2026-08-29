@@ -78,6 +78,10 @@ npm install
 cp .env.example .env
 ```
 
+Vaatii Node.js version 22.5 tai uudemman (kayttaa Node.js:n sisaanrakennettua
+`node:sqlite`-tukea - ei natiivimoduuleja, joten `npm install` ei vaadi
+kaannintyokaluja (Visual Studio Build Tools tms.) millaan alustalla).
+
 ### 2) Solana-lompakko
 
 Suositus: kayta **uutta, erillista lompakkoa** pelkastaan botille, ja siirra

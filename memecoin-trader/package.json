@@ -13,17 +13,18 @@
     "test": "node --import tsx --test src/strategy/learner.test.ts src/strategy/features.test.ts src/execution/riskManager.test.ts",
     "generate-wallet": "node scripts/generate-wallet.mjs"
   },
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "dependencies": {
     "@solana/spl-token": "^0.4.9",
     "@solana/web3.js": "^1.95.4",
-    "better-sqlite3": "^11.5.0",
     "bs58": "^6.0.0",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.11",
     "@types/express": "^4.17.21",
     "@types/node": "^22.9.0",
     "tsx": "^4.19.2",
