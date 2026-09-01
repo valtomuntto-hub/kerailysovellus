@@ -63,7 +63,7 @@ app.post('/api/keruutulokset', requireAuth, async (req, res) => {
     return res.status(400).json({ virhe: 'Tuotelista puuttuu.' }); // 400 = "Bad Request", pyyntö oli virheellinen
   }
 
-  const keraaja = req.user.nimi; // kerääjä luetaan JWT-tokenista (requireAuth asetti req.user), ei luoteta clientin lähettämään arvoon
+  const keraaja = req.user.sahkoposti; // kerääjä luetaan JWT-tokenista (requireAuth asetti req.user), ei luoteta clientin lähettämään arvoon
   const aikaleima = new Date();  // sama aikaleima kaikille tämän keräyksen riveille -> voidaan ryhmitellä yhdeksi raportiksi myöhemmin
 
   try {
@@ -110,7 +110,7 @@ app.get('/api/keruutulokset', requireAuth, async (req, res) => {
   try {
     const pool = await getPool();
     const tulos = await pool.request()
-      .input('keraaja', sql.VarChar, req.user.nimi)
+      .input('keraaja', sql.VarChar, req.user.sahkoposti)
       .query(`
         SELECT k.SKUId, p.SKUDescription, k.Maara, k.Keraaja, k.Aikaleima
         FROM dbo.MobileKeruuTulokset k

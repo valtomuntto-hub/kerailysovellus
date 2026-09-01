@@ -38,7 +38,7 @@ export default function App() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <div>
             <h1 style={{ color: '#60a5fa', margin: 0 }}>Keräilylista App</h1>
-            <p style={{ color: '#93c5fd', margin: '5px 0 0 0', fontSize: '14px' }}>kerääjä: {session.nimi}</p>
+            <p style={{ color: '#93c5fd', margin: '5px 0 0 0', fontSize: '14px' }}>kerääjä: {session.sahkoposti}</p>
           </div>
           <button
             onClick={handleLogout}

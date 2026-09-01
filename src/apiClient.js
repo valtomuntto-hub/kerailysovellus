@@ -2,8 +2,8 @@
 // API pyörii Win2022VM:llä samassa lähiverkossa kuin SQL Server - puhelin/tabletti
 // pitää olla samassa WiFi-verkossa jotta yhteys toimii.
 const API_URL = import.meta.env.VITE_API_URL || 'http://192.168.2.144:3001'; // API:n osoite: .env-tiedostosta, tai oletuksena suoraan VM:n IP
-const TOKEN_KEY = 'keruu_token';  // avain, jolla JWT-kirjautumislippu tallennetaan selaimen localStorageen
-const NIMI_KEY = 'keruu_nimi';    // avain, jolla kirjautuneen kerääjän nimi tallennetaan localStorageen
+const TOKEN_KEY = 'keruu_token';        // avain, jolla JWT-kirjautumislippu tallennetaan selaimen localStorageen
+const SAHKOPOSTI_KEY = 'keruu_sahkoposti'; // avain, jolla kirjautuneen kerääjän sähköposti tallennetaan selaimen localStorageen
 
 // localStorage säilyy selaimessa vaikka sivu päivitetään tai suljetaan ja avataan uudelleen -
 // näin kerääjän ei tarvitse kirjautua joka kerta uudelleen.
@@ -11,24 +11,24 @@ function getToken() {
   return localStorage.getItem(TOKEN_KEY);   // palauttaa tallennetun tokenin, tai null jos ei kirjautunut
 }
 
-// Kutsutaan onnistuneen kirjautumisen jälkeen: tallennetaan lippu ja nimi selaimen muistiin
-function setSession(token, nimi) {
+// Kutsutaan onnistuneen kirjautumisen jälkeen: tallennetaan lippu ja sähköposti selaimen muistiin
+function setSession(token, sahkoposti) {
   localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(NIMI_KEY, nimi);
+  localStorage.setItem(SAHKOPOSTI_KEY, sahkoposti);
 }
 
 // Kutsutaan uloskirjautuessa: pyyhitään tallennettu istunto pois
 function clearSession() {
   localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(NIMI_KEY);
+  localStorage.removeItem(SAHKOPOSTI_KEY);
 }
 
 // Palauttaa nykyisen istunnon (jos kirjautunut) tai null (jos ei) - tätä kutsutaan
 // sovelluksen käynnistyessä, jotta tiedetään näytetäänkö kirjautumislomake vai sovellus
 function getSession() {
   const token = getToken();
-  const nimi = localStorage.getItem(NIMI_KEY);
-  return token && nimi ? { token, nimi } : null;  // molemmat pitää löytyä, muuten ei kelvollinen istunto
+  const sahkoposti = localStorage.getItem(SAHKOPOSTI_KEY);
+  return token && sahkoposti ? { token, sahkoposti } : null;  // molemmat pitää löytyä, muuten ei kelvollinen istunto
 }
 
 // Yhteinen apufunktio kaikille API-kutsuille: lisää automaattisesti JSON-headerit
@@ -59,21 +59,21 @@ async function apiFetch(polku, options = {}) {
 // Tämä objekti on se, mitä React-komponentit oikeasti kutsuvat (esim. api.login(...)).
 // Jokainen metodi vastaa yhtä API:n reittiä server/index.js:ssä.
 export const api = {
-  // Kirjautuminen: lähettää nimen+PINin, tallentaa saadun tokenin automaattisesti
-  async login(nimi, pin) {
+  // Kirjautuminen: lähettää sähköpostin+salasanan, tallentaa saadun tokenin automaattisesti
+  async login(sahkoposti, salasana) {
     const data = await apiFetch('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ nimi, pin }),
+      body: JSON.stringify({ sahkoposti, salasana }),
     });
-    setSession(data.token, data.nimi);   // heti onnistuneen kirjautumisen jälkeen tallennetaan istunto
+    setSession(data.token, data.sahkoposti);   // heti onnistuneen kirjautumisen jälkeen tallennetaan istunto
     return data;
   },
 
   // Uuden kerääjän rekisteröinti (ei kirjaa automaattisesti sisään, pitää kirjautua erikseen)
-  async register(nimi, pin) {
+  async register(sahkoposti, salasana) {
     return apiFetch('/api/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ nimi, pin }),
+      body: JSON.stringify({ sahkoposti, salasana }),
     });
   },
 
