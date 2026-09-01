@@ -226,9 +226,15 @@ app.get('/api/asiakkaat', requireAuth, async (req, res) => {
   }
 });
 
-// --- Keruutehtävä: yhden tilauksen keruurivit (PickListLines JOIN ProductTypes) ---
+// --- Keruutehtävä: yhden tilauksen keruurivit PlannedParcels + PlannedProductItems -tauluista ---
 // Tämä ON se varsinainen "keruutehtävä": mitä SKU:ta, kuinka paljon ja mistä
 // keräilyalueelta pitää kerätä annetulle tilaukselle. Myös tämä on pelkkää lukua.
+//
+// HUOM: käytetään samoja "Planned"-tauluja kuin "Luo keruulista" -demossa
+// (ks. /api/keruulista yllä), EI PickListLines-taulua. PickListLines kuvaa mitä
+// tilaukseen alun perin TILATTIIN, kun taas PlannedParcels/PlannedProductItems
+// kuvaa mitä varastoautomaatio on OIKEASTI SUUNNITELLUT kerättäväksi juuri nyt
+// (ajantasaisempi, ja sisältää oikean keräilypaikan). Yhdistetään PickListId:llä.
 app.get('/api/keruutehtava/:pickListId', requireAuth, async (req, res) => {
   const { pickListId } = req.params;
 
@@ -237,21 +243,21 @@ app.get('/api/keruutehtava/:pickListId', requireAuth, async (req, res) => {
     const tulos = await pool.request()
       .input('pickListId', sql.VarChar, pickListId)
       .query(`
-        SELECT pl.PickLineNbr, pl.SKUId, pt.SKUDescription, pl.QtySU, pl.QtyBU, pl.PickArea, pl.BBD, pl.PickLineState
-        FROM dbo.PickListLines pl
-        LEFT JOIN dbo.ProductTypes pt ON pt.SKUId = pl.SKUId
-        WHERE pl.PickListId = @pickListId
-        ORDER BY pl.PickLineNbr`);
+        SELECT ppi.ProductItemId, pp.PlannedParcelId, ppi.SKUId, pt.SKUDescription, ppi.QtyPlannedSU, pp.PickingPlace, ppi.BBD, pp.PlannedParcelState
+        FROM dbo.PlannedParcels pp
+        JOIN dbo.PlannedProductItems ppi ON ppi.PlannedParcelId = pp.PlannedParcelId
+        LEFT JOIN dbo.ProductTypes pt ON pt.SKUId = ppi.SKUId
+        WHERE pp.PickListId = @pickListId
+        ORDER BY pp.PlannedParcelId, ppi.ProductItemId`);
 
     const rivit = tulos.recordset.map((r) => ({
-      rivi: r.PickLineNbr,
+      rivi: r.ProductItemId,
       skuId: r.SKUId,
       nimi: r.SKUDescription,
-      maaraSU: r.QtySU,
-      maaraBU: r.QtyBU,
-      alue: r.PickArea,
+      maaraSU: r.QtyPlannedSU,   // oikea suunniteltu määrä, sama periaate kuin /api/keruulista
+      alue: r.PickingPlace,
       bbd: r.BBD,
-      tila: r.PickLineState,
+      tila: r.PlannedParcelState,
     }));
 
     res.json({ pickListId, rivit });
