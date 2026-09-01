@@ -159,11 +159,12 @@ app.get('/api/asiakkaat', requireAuth, async (req, res) => {
 
   try {
     const pool = await getPool();
-    // TOP (200) suojaa liian ison tuloksen lataamiselta, koska PickLists on iso taulu (~14 000 riviä)
+    // Ei kiinteää kattoa - hakusana (WHERE-ehto) rajaa tuloksen jo kohtuulliseksi,
+    // koska tässä haetaan yhden asiakkaan/paikkakunnan tilauksia, ei koko taulua kerralla.
     const tulos = await pool.request()
       .input('haku', sql.VarChar, `%${haku}%`)
       .query(`
-        SELECT TOP (200) PickListId, CustomerName, CustomerAddr2, Destination, DeliveryDate, PickListStateFull, Priority
+        SELECT PickListId, CustomerName, CustomerAddr2, Destination, DeliveryDate, PickListStateFull, Priority
         FROM dbo.PickLists
         WHERE CustomerName LIKE @haku OR CustomerAddr2 LIKE @haku OR Destination LIKE @haku
         ORDER BY DeliveryDate DESC`);
