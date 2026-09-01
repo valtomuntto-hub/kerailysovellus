@@ -32,14 +32,17 @@ app.post('/api/auth/login', login);
 // --- Terveystarkistus (kätevä sen tarkistamiseen, että palvelu on käynnissä) ---
 app.get('/api/health', (_req, res) => res.json({ ok: true })); // GET = pelkkä tiedon haku, ei vaadi mitään dataa mukaan
 
-// --- Tuotteet: koko ProductTypes-katalogi (max 50 riviä, kaikki kerralla) ---
+// --- Tuotteet: koko ProductTypes-katalogi, kaikki rivit kerralla ---
+// HUOM: taulussa oli alun perin tasan 50 riviä, joten TOP (50) oli silloin "kaikki".
+// Data on sittemmin kasvanut (nyt yli 1300 riviä), joten yläraja poistettiin - haetaan
+// aina KAIKKI rivit, ei kiinteää kattoa.
 // "requireAuth" ennen käsittelijää tarkoittaa: tämä reitti toimii vain jos pyynnön
 // mukana tulee kelvollinen Authorization-token (ks. auth.js:n requireAuth-funktio).
 app.get('/api/tuotteet', requireAuth, async (_req, res) => {
   try {
     const pool = await getPool();
     const tulos = await pool.request()
-      .query('SELECT TOP (50) SKUId, SKUDescription FROM dbo.ProductTypes ORDER BY SKUId');
+      .query('SELECT SKUId, SKUDescription FROM dbo.ProductTypes ORDER BY SKUId');
 
     // Muunnetaan SQL-sarakkeet (SKUId, SKUDescription) React-puolen odottamiksi
     // kenttänimiksi (skuId, nimi) - pieni "käännös" tietokannan ja käyttöliittymän välillä
