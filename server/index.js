@@ -23,7 +23,10 @@ const sallitutOrigin = (process.env.CORS_ORIGIN || 'http://localhost:5173')
   .map((s) => s.trim());
 app.use(cors({ origin: sallitutOrigin })); // "app.use" = ajetaan JOKAISELLE saapuvalle pyynnölle ennen reittejä
 
-app.use(express.json()); // jäsentää saapuvan JSON-rungon automaattisesti req.body-oliaksi
+// Expressin oletusraja JSON-pyynnölle on vain 100kb - liian pieni, koska keruulista
+// voi nyt sisältää yli tuhat tuoteriviä (ProductTypesin kasvettua). Nostetaan rajaa,
+// jotta "Merkitse valmiiksi" ei kaadu HTTP 413 -virheeseen ("Payload Too Large").
+app.use(express.json({ limit: '5mb' })); // jäsentää saapuvan JSON-rungon automaattisesti req.body-oliaksi
 
 // --- Tunnistautuminen (ei vaadi kirjautumista - näitä pitää päästä kutsumaan ilman tokenia) ---
 app.post('/api/auth/register', register); // POST = lähetetään dataa palvelimelle (uusi kerääjä)
