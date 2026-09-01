@@ -275,6 +275,10 @@ function AppContent() {
       </div>
 
       <div style={{ marginBottom: '30px' }}>
+        <AsiakasKeruu />
+      </div>
+
+      <div style={{ marginBottom: '30px' }}>
         <Yhteenveto keruulista={keruulista} />
       </div>
 
@@ -305,6 +309,153 @@ function AppContent() {
           ))
         )}
       </div>
+    </div>
+  );
+}
+
+// Hakee OIKEITA tuotannon tilauksia PickLists/PickListLines-tauluista asiakkaan nimen tai
+// postinumeron/paikkakunnan perusteella, ja näyttää valitun tilauksen keruutehtävän (mitä
+// pitää kerätä). Sovellus VAIN LUKEE näitä tauluja - ei koskaan muokkaa mitään.
+function AsiakasKeruu() {
+  const [haku, setHaku] = useState('');                        // hakukentän sisältö
+  const [tilaukset, setTilaukset] = useState([]);                // haun löytämät PickLists-rivit
+  const [valittuPickListId, setValittuPickListId] = useState(null); // mikä tilaus on juuri nyt valittuna (korostusta varten)
+  const [keruutehtava, setKeruutehtava] = useState(null);         // valitun tilauksen keruurivit ({ pickListId, rivit })
+  const [ladataan, setLadataan] = useState(false);
+  const [virhe, setVirhe] = useState('');
+
+  // Hakee tilaukset API:sta hakusanan perusteella (GET /api/asiakkaat?haku=...)
+  const haeTilaukset = async () => {
+    if (!haku.trim()) {
+      setVirhe('Kirjoita ensin asiakkaan nimi tai postinumero/paikkakunta.');
+      return;
+    }
+
+    setLadataan(true);
+    setVirhe('');
+    setKeruutehtava(null);        // tyhjennetään vanha keruutehtävä uuden haun ajaksi
+    setValittuPickListId(null);
+
+    try {
+      const data = await api.haeAsiakkaat(haku.trim());
+      setTilaukset(data || []);
+      if ((data || []).length === 0) {
+        setVirhe('Ei tilauksia löytynyt haulla.');
+      }
+    } catch (err) {
+      setVirhe('Haku epäonnistui: ' + err.message);
+    } finally {
+      setLadataan(false);
+    }
+  };
+
+  // Kun käyttäjä klikkaa yhtä tilausta listasta, haetaan sen keruurivit (GET /api/keruutehtava/:id)
+  const valitseTilaus = async (pickListId) => {
+    setValittuPickListId(pickListId);
+    setLadataan(true);
+
+    try {
+      const data = await api.haeKeruutehtava(pickListId);
+      setKeruutehtava(data);
+    } catch (err) {
+      setVirhe('Keruutehtävän haku epäonnistui: ' + err.message);
+    } finally {
+      setLadataan(false);
+    }
+  };
+
+  return (
+    <div style={{
+      background: 'rgba(15, 23, 42, 0.85)',
+      padding: '25px',
+      borderRadius: '12px',
+      border: '1px solid #3b82f6',
+      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
+    }}>
+      <h2 style={{ color: '#60a5fa', marginTop: 0 }}>🏬 Asiakaskeruu</h2>
+      <p style={{ color: '#93c5fd', fontSize: '14px', marginTop: 0 }}>
+        Hae oikea tilaus asiakkaan nimellä tai postinumerolla/paikkakunnalla (esim. "Sipoo" tai "04130")
+      </p>
+
+      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+        <input
+          type="text"
+          value={haku}
+          onChange={(e) => setHaku(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && haeTilaukset()}
+          placeholder="Nimi tai postinumero/paikkakunta"
+          style={{
+            flex: 1,
+            minWidth: '200px',
+            padding: '10px',
+            backgroundColor: '#1e293b',
+            color: '#fff',
+            border: '1px solid #475569',
+            borderRadius: '6px',
+            fontSize: '15px'
+          }}
+        />
+        <button
+          onClick={haeTilaukset}
+          disabled={ladataan}
+          style={{
+            padding: '10px 18px',
+            backgroundColor: '#2563eb',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontWeight: 'bold'
+          }}
+        >
+          {ladataan ? 'Haetaan...' : '🔍 Hae tilaukset'}
+        </button>
+      </div>
+
+      {virhe && <p style={{ color: '#fca5a5', marginTop: '10px' }}>{virhe}</p>}
+
+      {tilaukset.length > 0 && (
+        <div style={{ marginTop: '15px', maxHeight: '260px', overflowY: 'auto' }}>
+          {tilaukset.map((t) => (
+            <div
+              key={t.pickListId}
+              onClick={() => valitseTilaus(t.pickListId)}
+              style={{
+                padding: '10px',
+                marginBottom: '6px',
+                backgroundColor: valittuPickListId === t.pickListId ? '#1e3a8a' : '#1e293b',
+                border: '1px solid #334155',
+                borderRadius: '6px',
+                cursor: 'pointer'
+              }}
+            >
+              <strong>{t.asiakas}</strong> — {t.paikkakunta} — {t.toimituspaikka}
+              <br />
+              <small style={{ color: '#93c5fd' }}>
+                {t.pickListId} | {t.toimituspaiva ? new Date(t.toimituspaiva).toLocaleDateString('fi-FI') : '—'} | {t.tila}
+              </small>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {keruutehtava && (
+        <div style={{ marginTop: '20px', backgroundColor: '#1e293b', padding: '15px', borderRadius: '8px', border: '1px solid #334155' }}>
+          <h3 style={{ color: '#60a5fa', marginTop: 0 }}>📋 Keruutehtävä: {keruutehtava.pickListId}</h3>
+          {keruutehtava.rivit.length === 0 ? (
+            <p style={{ color: '#93c5fd' }}>Tälle tilaukselle ei löytynyt keruurivejä.</p>
+          ) : (
+            <ul style={{ paddingLeft: '20px', margin: 0 }}>
+              {keruutehtava.rivit.map((r) => (
+                <li key={r.rivi} style={{ marginBottom: '6px' }}>
+                  <strong>{r.nimi || `SKU ${r.skuId}`}</strong> (SKU {r.skuId}) — {r.maaraSU} kpl
+                  {r.alue ? ` — alue ${r.alue}` : ''} — <span style={{ color: '#93c5fd' }}>{r.tila}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }

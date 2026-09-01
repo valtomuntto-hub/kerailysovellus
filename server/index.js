@@ -145,6 +145,78 @@ app.get('/api/keruutulokset', requireAuth, async (req, res) => {
   }
 });
 
+// --- Asiakashaku: hae tilauksia PickLists-taulusta nimen/postinumeron/paikkakunnan perusteella ---
+// PickLists on OIKEA tuotannon tilaustaulu (sama data jota varaston automaatio käyttää).
+// Tämä reitti VAIN LUKEE sitä (SELECT) - ei koskaan muokkaa mitään.
+app.get('/api/asiakkaat', requireAuth, async (req, res) => {
+  const haku = String(req.query.haku || '').trim();
+  if (!haku) {
+    return res.status(400).json({ virhe: 'Anna hakusana (asiakkaan nimi tai postinumero/paikkakunta).' });
+  }
+
+  try {
+    const pool = await getPool();
+    // TOP (200) suojaa liian ison tuloksen lataamiselta, koska PickLists on iso taulu (~14 000 riviä)
+    const tulos = await pool.request()
+      .input('haku', sql.VarChar, `%${haku}%`)
+      .query(`
+        SELECT TOP (200) PickListId, CustomerName, CustomerAddr2, Destination, DeliveryDate, PickListStateFull, Priority
+        FROM dbo.PickLists
+        WHERE CustomerName LIKE @haku OR CustomerAddr2 LIKE @haku OR Destination LIKE @haku
+        ORDER BY DeliveryDate DESC`);
+
+    const tilaukset = tulos.recordset.map((r) => ({
+      pickListId: r.PickListId,
+      asiakas: r.CustomerName,
+      paikkakunta: r.CustomerAddr2,
+      toimituspaikka: r.Destination,
+      toimituspaiva: r.DeliveryDate,
+      tila: r.PickListStateFull,
+      prioriteetti: r.Priority,
+    }));
+
+    res.json(tilaukset);
+  } catch (err) {
+    console.error('Asiakashaku epäonnistui:', err);
+    res.status(500).json({ virhe: 'Asiakashaku epäonnistui.' });
+  }
+});
+
+// --- Keruutehtävä: yhden tilauksen keruurivit (PickListLines JOIN ProductTypes) ---
+// Tämä ON se varsinainen "keruutehtävä": mitä SKU:ta, kuinka paljon ja mistä
+// keräilyalueelta pitää kerätä annetulle tilaukselle. Myös tämä on pelkkää lukua.
+app.get('/api/keruutehtava/:pickListId', requireAuth, async (req, res) => {
+  const { pickListId } = req.params;
+
+  try {
+    const pool = await getPool();
+    const tulos = await pool.request()
+      .input('pickListId', sql.VarChar, pickListId)
+      .query(`
+        SELECT pl.PickLineNbr, pl.SKUId, pt.SKUDescription, pl.QtySU, pl.QtyBU, pl.PickArea, pl.BBD, pl.PickLineState
+        FROM dbo.PickListLines pl
+        LEFT JOIN dbo.ProductTypes pt ON pt.SKUId = pl.SKUId
+        WHERE pl.PickListId = @pickListId
+        ORDER BY pl.PickLineNbr`);
+
+    const rivit = tulos.recordset.map((r) => ({
+      rivi: r.PickLineNbr,
+      skuId: r.SKUId,
+      nimi: r.SKUDescription,
+      maaraSU: r.QtySU,
+      maaraBU: r.QtyBU,
+      alue: r.PickArea,
+      bbd: r.BBD,
+      tila: r.PickLineState,
+    }));
+
+    res.json({ pickListId, rivit });
+  } catch (err) {
+    console.error('Keruutehtävän haku epäonnistui:', err);
+    res.status(500).json({ virhe: 'Keruutehtävän haku epäonnistui.' });
+  }
+});
+
 // --- Kokonaisraportin laskenta (sama logiikka kuin entisessä Vercel-funktiossa) ---
 // Huom: tämä reitti EI kosketa tietokantaa lainkaan - se vain laskee lukuja
 // suoraan React-sovelluksen lähettämästä keruulistasta (nopea, ei tarvitse SQL-kyselyä).

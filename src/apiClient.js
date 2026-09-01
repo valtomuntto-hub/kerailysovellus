@@ -109,5 +109,16 @@ export const api = {
     });
   },
 
+  // Hakee asiakkaan tilaukset PickLists-taulusta nimen/postinumeron/paikkakunnan perusteella.
+  // encodeURIComponent estää hakusanan erikoismerkkejä (esim. välilyönnit) rikkomasta URL:ia.
+  haeAsiakkaat(haku) {
+    return apiFetch(`/api/asiakkaat?haku=${encodeURIComponent(haku)}`);
+  },
+
+  // Hakee yhden tilauksen keruutehtävän (mitä pitää kerätä) sen PickListId:n perusteella
+  haeKeruutehtava(pickListId) {
+    return apiFetch(`/api/keruutehtava/${encodeURIComponent(pickListId)}`);
+  },
+
   getSession,   // viedään myös tämä ulos, jotta App.jsx voi lukea istunnon käynnistyessä
 };
