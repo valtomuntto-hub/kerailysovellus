@@ -124,20 +124,26 @@ function AppContent() {
     }
   };
 
+  // Napin "✔️ Kerätty / ❌ Ei kerätty" klikkaus - kääntää yhden rivin kerätty-tilan.
+  // .map() luo UUDEN taulukon (React ei huomaisi muutosta jos muokattaisiin vanhaa suoraan).
   const vaihdakerätty = (index) => {
     setKeruulista(keruulista.map((item, i) =>
       i === index ? { ...item, kerätty: !item.kerätty } : item
     ));
   };
 
+  // Käyttäjä kirjoittaa "Kerätty määrä" -kenttään - Math.max(0, ...) estää negatiivisen luvun
   const muutaKerattyMaaraa = (index, uusiMaara) => {
     setKeruulista(keruulista.map((item, i) =>
       i === index ? { ...item, kerattyMaara: Math.max(0, Number(uusiMaara)) } : item
     ));
   };
 
+  // "✅ Merkitse valmiiksi" -nappi: lähettää koko keruulistan (jokaisen rivin kerätyn
+  // määrän) tallennettavaksi API:lle, ja päivittää sen jälkeen alla olevan raporttilistan
+  // näyttämään myös juuri tallennetun keräyksen.
   const merkitseValmiiksi = async () => {
-    setValmis(true);
+    setValmis(true); // vaihtaa näkymän "aktiivinen keruu" -listasta "keräysraportti"-yhteenvetoon
     try {
       await api.tallennaKeruu(keruulista);
       haeRaportitTietokannasta();
