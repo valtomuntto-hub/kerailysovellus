@@ -88,6 +88,12 @@ export const api = {
     return apiFetch('/api/tuotteet');
   },
 
+  // Hakee valmiin keruulistan (max 10 riviä oikeaa suunniteltua työtä
+  // PlannedParcels+PlannedProductItems-tauluista, satunnainen otanta joka kerta)
+  haeKeruulista() {
+    return apiFetch('/api/keruulista');
+  },
+
   // Hakee kirjautuneen kerääjän aiemmin tallentamat keruuraportit
   haeRaportit() {
     return apiFetch('/api/keruutulokset');

@@ -35,6 +35,43 @@ app.post('/api/auth/login', login);
 // --- Terveystarkistus (kätevä sen tarkistamiseen, että palvelu on käynnissä) ---
 app.get('/api/health', (_req, res) => res.json({ ok: true })); // GET = pelkkä tiedon haku, ei vaadi mitään dataa mukaan
 
+// --- Keruulista: max 10 riviä OIKEAA suunniteltua keräilytyötä (PlannedParcels + PlannedProductItems) ---
+// Aiemmin "Luo keruulista" arpoi satunnaisen määrän ProductTypes-katalogin tuotteista
+// (pelkkä demo, ei oikeaa dataa). Nyt keruulista poimitaan oikeasta, vielä keräämättömästä
+// työstä: PlannedParcels = yksi "parcel" (kerättävä pakkaus/tote) joka kuuluu tilaukseen,
+// PlannedProductItems = parcelin sisällä olevat tuoterivit OIKEALLA suunnitellulla
+// määrällä (QtyPlannedSU). Vain "Planned"-tilaiset parcelit otetaan mukaan - ne eivät
+// ole vielä kerättyjä ("Picked"/"Picking"/"Prepicked" jätetään pois).
+app.get('/api/keruulista', requireAuth, async (_req, res) => {
+  try {
+    const pool = await getPool();
+    // ORDER BY NEWID() = SQL Serverin tapa arpoa satunnainen järjestys, jotta joka
+    // klikkaus "Luo keruulista" -napista antaa vaihtelevan otannan oikeasta työjonosta.
+    const tulos = await pool.request()
+      .query(`
+        SELECT TOP (10) ppi.PlannedParcelId, ppi.SKUId, pt.SKUDescription, ppi.QtyPlannedSU, ppi.BBD, pp.PickListId, pp.PlannedParcelState
+        FROM dbo.PlannedProductItems ppi
+        JOIN dbo.PlannedParcels pp ON pp.PlannedParcelId = ppi.PlannedParcelId
+        LEFT JOIN dbo.ProductTypes pt ON pt.SKUId = ppi.SKUId
+        WHERE pp.PlannedParcelState = 'Planned'
+        ORDER BY NEWID()`);
+
+    const rivit = tulos.recordset.map((r) => ({
+      skuId: r.SKUId,
+      nimi: r.SKUDescription,
+      maara: r.QtyPlannedSU,   // OIKEA suunniteltu määrä - ei enää arvottu satunnaisluku
+      bbd: r.BBD,
+      pickListId: r.PickListId,
+      parcelId: r.PlannedParcelId,
+    }));
+
+    res.json(rivit);
+  } catch (err) {
+    console.error('Keruulistan haku epäonnistui:', err);
+    res.status(500).json({ virhe: 'Keruulistan haku epäonnistui.' });
+  }
+});
+
 // --- Tuotteet: koko ProductTypes-katalogi, kaikki rivit kerralla ---
 // HUOM: taulussa oli alun perin tasan 50 riviä, joten TOP (50) oli silloin "kaikki".
 // Data on sittemmin kasvanut (nyt yli 1300 riviä), joten yläraja poistettiin - haetaan

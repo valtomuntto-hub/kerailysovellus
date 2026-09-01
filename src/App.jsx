@@ -62,7 +62,6 @@ export default function App() {
 }
 
 function AppContent() {
-  const [tuotekatalogi, setTuotekatalogi] = useState([]);   // ProductTypes-tuotteet API:sta
   const [keruulista, setKeruulista] = useState([]);          // aktiivinen, käyttäjän täyttämä keruulista
   const [valmis, setValmis] = useState(false);                // onko nykyinen keruu merkitty valmiiksi
   const [tietokantaRaportit, setTietokantaRaportit] = useState([]); // aiemmin tallennetut keräykset
@@ -72,7 +71,6 @@ function AppContent() {
 
   // Ajetaan kerran komponentin latautuessa: haetaan alkudata ja seurataan ikkunan kokoa
   useEffect(() => {
-    haeTuotteetTietokannasta();
     haeRaportitTietokannasta();
 
     const tarkistaKoko = () => setOnPuhelin(window.innerWidth < 768);
@@ -80,17 +78,6 @@ function AppContent() {
     window.addEventListener('resize', tarkistaKoko);
     return () => window.removeEventListener('resize', tarkistaKoko); // siivotaan kuuntelija pois
   }, []);
-
-  // Hakee koko ProductTypes-tuotekatalogin (stodb) paikallisen API:n kautta
-  const haeTuotteetTietokannasta = async () => {
-    try {
-      const data = await api.haeTuotteet();
-      setTuotekatalogi(data || []);
-    } catch (err) {
-      console.error('Virhe haettaessa tuotteita:', err);
-      setVirheviesti('Tuotteiden haku epäonnistui: ' + err.message);
-    }
-  };
 
   const haeRaportitTietokannasta = async () => {
     setLadataan(true);
@@ -105,26 +92,36 @@ function AppContent() {
     }
   };
 
-  // Keruulista = KAIKKI tuotekatalogin tuotteet kerralla (max 50 kpl, ProductTypesin koko sisältö).
-  // Jokaiselle riville arvotaan "tilattu määrä" samalla tavalla kuin aiemmassa demo-versiossa.
-  const luokeruulista = () => {
-    if (tuotekatalogi.length === 0) {
-      alert('Tuoteluettelo on tyhjä tai sitä ei saatu ladattua tietokannasta!');
-      return;
-    }
+  // Keruulista = max 10 riviä OIKEAA suunniteltua keräilytyötä (PlannedParcels +
+  // PlannedProductItems, ks. server/index.js:n /api/keruulista). Määrä on nyt oikea
+  // suunniteltu määrä (QtyPlannedSU), ei enää satunnaisesti arvottu demoluku.
+  const luokeruulista = async () => {
+    setLadataan(true);
+    setVirheviesti('');
 
-    const uusiLista = tuotekatalogi.map((tuote) => {
-      const maara = Math.floor(Math.random() * 8) + 1;
-      return {
-        ...tuote,
-        määrä: maara,
-        kerattyMaara: maara,
+    try {
+      const rivit = await api.haeKeruulista();
+
+      if (!rivit || rivit.length === 0) {
+        alert('Keruulistaa ei saatu ladattua - ei löytynyt suunniteltua työtä tietokannasta.');
+        return;
+      }
+
+      const uusiLista = rivit.map((rivi) => ({
+        ...rivi,
+        määrä: rivi.maara,          // "tilattu määrä" = oikea suunniteltu määrä
+        kerattyMaara: rivi.maara,   // alkuarvoksi sama, käyttäjä muokkaa keräyksen edetessä
         kerätty: false
-      };
-    });
+      }));
 
-    setKeruulista(uusiLista);
-    setValmis(false);
+      setKeruulista(uusiLista);
+      setValmis(false);
+    } catch (err) {
+      console.error('Virhe haettaessa keruulistaa:', err);
+      setVirheviesti('Keruulistan haku epäonnistui: ' + err.message);
+    } finally {
+      setLadataan(false);
+    }
   };
 
   const vaihdakerätty = (index) => {
@@ -170,6 +167,7 @@ function AppContent() {
 
         <button
           onClick={luokeruulista}
+          disabled={ladataan}
           style={{
             padding: '10px 18px',
             backgroundColor: '#2563eb',
@@ -181,7 +179,7 @@ function AppContent() {
             fontSize: '15px'
           }}
         >
-          🎲 Luo keruulista ({tuotekatalogi.length} tuotetta)
+          {ladataan ? 'Ladataan...' : '🎲 Luo keruulista (max 10 riviä)'}
         </button>
 
         {keruulista.length > 0 && !valmis && (
