@@ -1,0 +1,78 @@
+import express from "express";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { config } from "../config.js";
+import { logger } from "../logger.js";
+import * as db from "../persistence/db.js";
+import { getSolBalance } from "../wallet.js";
+import { fetchPairsForMints } from "../data/dexscreener.js";
+import { parseWatchedWallets } from "../data/walletTracker.js";
+import { isEnabled as isTwitterEnabled, parseWatchedHandles } from "../data/twitterSignal.js";
+import type { TradeEngine } from "../execution/tradeEngine.js";
+import { MODEL_INPUT_LABELS } from "../strategy/features.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const publicDir = path.resolve(__dirname, "../../public");
+
+/** Kevyt read-only dashboard-API + staattisten tiedostojen tarjoilu. */
+export function startServer(engine: TradeEngine): void {
+  const app = express();
+  app.use(express.static(publicDir));
+
+  app.get("/api/status", async (_req, res) => {
+    const today = db.getTodayStats();
+    let solBalance: number | null = null;
+    if (config.LIVE_TRADING) {
+      try {
+        solBalance = await getSolBalance();
+      } catch {
+        // Lompakkoa ei ole asetettu tai RPC ei vastaa.
+      }
+    } else {
+      solBalance = db.getPaperBalanceSol(config.PAPER_STARTING_BALANCE_SOL);
+    }
+    res.json({
+      liveTrading: config.LIVE_TRADING,
+      solBalance,
+      today,
+      config: {
+        maxPositionSol: config.MAX_POSITION_SOL,
+        maxConcurrentPositions: config.MAX_CONCURRENT_POSITIONS,
+        maxDailyLossSol: config.MAX_DAILY_LOSS_SOL,
+        takeProfitPct: config.TAKE_PROFIT_PCT,
+        stopLossPct: config.STOP_LOSS_PCT,
+      },
+      learner: {
+        trainedExamples: engine.learner.trainedExamples,
+        weights: engine.learner.weights,
+        weightLabels: MODEL_INPUT_LABELS,
+      },
+      watchedWalletsCount: parseWatchedWallets().length,
+      twitterEnabled: isTwitterEnabled(),
+      watchedTwitterHandlesCount: parseWatchedHandles().length,
+    });
+  });
+
+  app.get("/api/positions", async (_req, res) => {
+    const open = db.getOpenPositions();
+    const priceMap = await fetchPairsForMints(open.map((p) => p.mint), config.DEXSCREENER_CHAIN).catch(() => new Map());
+    const openWithPnl = open.map((p) => {
+      const currentPriceUsd = priceMap.get(p.mint)?.priceUsd ?? null;
+      const pnlPct = currentPriceUsd ? ((currentPriceUsd - p.entryPriceUsd) / p.entryPriceUsd) * 100 : null;
+      return { ...p, currentPriceUsd, pnlPct };
+    });
+    res.json({ open: openWithPnl, closed: db.getClosedPositions(50) });
+  });
+
+  app.get("/api/trades", (_req, res) => {
+    res.json(db.getRecentTrades(100));
+  });
+
+  // Sidotaan eksplisiittisesti 127.0.0.1:aan (ei 0.0.0.0/::) - tama on
+  // henkilokohtainen, autentikoimaton dashboard eika sen pida nakya
+  // verkkoon, ja eksplisiittinen osoite valttaa Windowsilla joskus
+  // esiintyvat IPv4/IPv6-oletussidonnan sekaannukset.
+  app.listen(config.PORT, "127.0.0.1", () => {
+    logger.info(`Dashboard kaynnissa: http://localhost:${config.PORT}`);
+  });
+}
